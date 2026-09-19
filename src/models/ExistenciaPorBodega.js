@@ -41,7 +41,8 @@ const ExistenciaPorBodega = sequelize.define('ExistenciaPorBodega', {
   }
 }, {
   tableName: 'existencias_por_bodega',
-  timestamps: true
+  timestamps: true,
+  indexes: [{ unique: true, fields: ['producto_id', 'bodega_id'] }] // D-10: un par, una fila
 });
 
 module.exports = ExistenciaPorBodega;
