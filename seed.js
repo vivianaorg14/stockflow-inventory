@@ -1,106 +1,88 @@
-// seed.js — Carga datos iniciales de prueba en StockFlow
-// Ejecutar con: npm run seed
-// ⚠️ Este script BORRA y RECREA todas las tablas cada vez que se ejecuta.
+// seed.js — Datos de demo de StockFlow. Ejecutar con: npm run seed
+// ⚠️ BORRA y recrea todas las tablas.
+// Las existencias se crean SOLO a través de movimientos, para que la auditoría
+// de R3 cuadre desde el primer momento (D-02).
 
-const { sincronizar, Producto, Bodega, ExistenciaPorBodega, Movimiento, Pedido, ItemPedido } = require('./src/models');
+const { sincronizar, Producto, Bodega } = require('./src/models');
+const { registrarMovimiento, fijarMinimo } = require('./src/servicios/inventario');
+const { crearPedido } = require('./src/servicios/pedidos');
 
-async function seed() {
-  console.log('🌱 Iniciando carga de datos de prueba...\n');
+// [sku, bodega, entrada inicial, mínimo]. Cuatro pares quedan bajo mínimo a propósito.
+const EXISTENCIAS_INICIALES = [
+  ['PAP-001', 'Bodega Norte', 50, 100],   // bajo mínimo
+  ['PAP-001', 'Bodega Sur', 320, 50],
+  ['PAP-001', 'Bodega Central', 0, 100],  // se abastece por traslado
+  ['TON-002', 'Bodega Norte', 30, 10],
+  ['TON-002', 'Bodega Central', 15, 15],  // queda en 5 tras la salida → bajo mínimo
+  ['CAB-003', 'Bodega Sur', 80, 20],
+  ['CAB-003', 'Bodega Central', 45, 50],  // bajo mínimo
+  ['MOU-004', 'Bodega Norte', 60, 30],
+  ['MOU-004', 'Bodega Sur', 25, 30],      // bajo mínimo
+  ['TEC-005', 'Bodega Norte', 8, 5]
+];
 
-  // force: true borra y recrea las tablas (solo para desarrollo)
+// `registrar` es opcional (default silencioso): los tests siguen llamando cargarDatosDemo() sin
+// argumentos; `require.main === module` (ejecución por CLI) le pasa console.log (M-06).
+async function cargarDatosDemo(registrar = () => {}) {
   await sincronizar(true);
-  console.log('✅ Tablas creadas\n');
 
-  // --- Bodegas ---
-  const [bNorte, bSur, bCentral] = await Bodega.bulkCreate([
-    { nombre: 'Bodega Norte', ubicacion: 'Calle 80 # 15-20' },
-    { nombre: 'Bodega Sur', ubicacion: 'Autopista Sur Km 12' },
-    { nombre: 'Bodega Central', ubicacion: 'Av. Caracas # 45-10' }
-  ]);
-  console.log('✅ 3 Bodegas creadas');
+  const bodegas = {};
+  for (const [nombre, ubicacion] of [
+    ['Bodega Norte', 'Calle 80 # 15-20'],
+    ['Bodega Sur', 'Autopista Sur Km 12'],
+    ['Bodega Central', 'Av. Caracas # 45-10']
+  ]) bodegas[nombre] = await Bodega.create({ nombre, ubicacion });
+  registrar('✅ 3 bodegas creadas');
 
-  // --- Productos (1 descontinuado) ---
-  const [pResma, pToner, pCable, pMouse, pTeclado] = await Producto.bulkCreate([
-    { sku: 'PAP-001', nombre: 'Papel Resma A4', descripcion: 'Resma de 500 hojas', estado: 'ACTIVO' },
-    { sku: 'TON-002', nombre: 'Tóner HP LaserJet', descripcion: 'Compatible con serie 1020', estado: 'ACTIVO' },
-    { sku: 'CAB-003', nombre: 'Cable HDMI 2m', descripcion: 'Cable HDMI 4K', estado: 'ACTIVO' },
-    { sku: 'MOU-004', nombre: 'Mouse Inalámbrico', descripcion: 'Mouse USB inalámbrico', estado: 'ACTIVO' },
-    { sku: 'TEC-005', nombre: 'Teclado PS2', descripcion: 'Teclado conector PS2 — descontinuado', estado: 'DESCONTINUADO' }
-  ]);
-  console.log('✅ 5 Productos creados (1 descontinuado)\n');
+  const productos = {};
+  for (const [sku, nombre, descripcion] of [
+    ['PAP-001', 'Papel Resma A4', 'Resma de 500 hojas'],
+    ['TON-002', 'Tóner HP LaserJet', 'Compatible con serie 1020'],
+    ['CAB-003', 'Cable HDMI 2m', 'Cable HDMI 4K'],
+    ['MOU-004', 'Mouse Inalámbrico', 'Mouse USB inalámbrico'],
+    ['TEC-005', 'Teclado PS2', 'Teclado conector PS2 — descontinuado']
+  ]) productos[sku] = await Producto.create({ sku, nombre, descripcion, estado: 'ACTIVO' });
 
-  // --- Existencias iniciales por bodega ---
-  // Formato: { producto, bodega, cantidad_actual, minimo }
-  const existencias = [
-    // Papel
-    { producto_id: pResma.id, bodega_id: bNorte.id, cantidad_actual: 50, minimo: 100 },  // ← bajo mínimo
-    { producto_id: pResma.id, bodega_id: bSur.id, cantidad_actual: 200, minimo: 50 },
-    { producto_id: pResma.id, bodega_id: bCentral.id, cantidad_actual: 120, minimo: 100 },
-
-    // Tóner
-    { producto_id: pToner.id, bodega_id: bNorte.id, cantidad_actual: 30, minimo: 10 },
-    { producto_id: pToner.id, bodega_id: bCentral.id, cantidad_actual: 5, minimo: 15 },   // ← bajo mínimo
-
-    // Cable HDMI
-    { producto_id: pCable.id, bodega_id: bSur.id, cantidad_actual: 80, minimo: 20 },
-    { producto_id: pCable.id, bodega_id: bCentral.id, cantidad_actual: 45, minimo: 50 }, // ← bajo mínimo
-
-    // Mouse
-    { producto_id: pMouse.id, bodega_id: bNorte.id, cantidad_actual: 60, minimo: 30 },
-    { producto_id: pMouse.id, bodega_id: bSur.id, cantidad_actual: 25, minimo: 30 },     // ← bajo mínimo
-
-    // Teclado PS2 (descontinuado — tiene existencias pero no puede recibir entradas)
-    { producto_id: pTeclado.id, bodega_id: bNorte.id, cantidad_actual: 8, minimo: 5 }
-  ];
-
-  await ExistenciaPorBodega.bulkCreate(existencias);
-  console.log('✅ Existencias iniciales cargadas (4 casos bajo mínimo)\n');
-
-  // --- Movimientos históricos de ejemplo ---
-  await Movimiento.bulkCreate([
-    {
-      tipo: 'ENTRADA',
-      producto_id: pResma.id,
-      bodega_destino_id: bSur.id,
-      cantidad: 200,
-      notas: 'Compra inicial de inventario'
-    },
-    {
-      tipo: 'TRASLADO',
-      producto_id: pResma.id,
-      bodega_origen_id: bSur.id,
-      bodega_destino_id: bCentral.id,
-      cantidad: 120,
-      notas: 'Traslado para abastecer Bodega Central'
-    },
-    {
-      tipo: 'SALIDA',
-      producto_id: pToner.id,
-      bodega_origen_id: bCentral.id,
-      cantidad: 10,
-      notas: 'Entrega a área de sistemas'
+  for (const [sku, bodega, cantidad, minimo] of EXISTENCIAS_INICIALES) {
+    await fijarMinimo(productos[sku].id, bodegas[bodega].id, minimo);
+    if (cantidad > 0) {
+      await registrarMovimiento({
+        tipo: 'ENTRADA', producto_id: productos[sku].id, bodega_destino_id: bodegas[bodega].id,
+        cantidad, notas: 'Inventario inicial'
+      });
     }
-  ]);
-  console.log('✅ 3 Movimientos históricos registrados\n');
+  }
+  registrar('✅ 5 productos creados (1 descontinuado)');
+  registrar('✅ 10 existencias vía movimientos');
 
-  // --- Pedido de prueba ---
-  const pedido = await Pedido.create({
-    descripcion: 'Pedido de prueba — suministros oficina',
-    estado: 'PENDIENTE'
+  // El teclado recibió su stock siendo ACTIVO; ahora se descontinúa (R4 aplica desde aquí).
+  await productos['TEC-005'].update({ estado: 'DESCONTINUADO' });
+
+  await registrarMovimiento({
+    tipo: 'TRASLADO', producto_id: productos['PAP-001'].id,
+    bodega_origen_id: bodegas['Bodega Sur'].id, bodega_destino_id: bodegas['Bodega Central'].id,
+    cantidad: 120, notas: 'Traslado para abastecer Bodega Central'
   });
+  await registrarMovimiento({
+    tipo: 'SALIDA', producto_id: productos['TON-002'].id, bodega_origen_id: bodegas['Bodega Central'].id,
+    cantidad: 10, notas: 'Entrega a área de sistemas'
+  });
+  registrar('✅ traslado y salida de ejemplo');
 
-  await ItemPedido.bulkCreate([
-    { pedido_id: pedido.id, producto_id: pResma.id, cantidad_solicitada: 100, cantidad_despachada: 0 },
-    { pedido_id: pedido.id, producto_id: pMouse.id, cantidad_solicitada: 20, cantidad_despachada: 0 }
-  ]);
-  console.log('✅ 1 Pedido de prueba creado (estado PENDIENTE)\n');
-
-  console.log('🎉 Datos de prueba cargados exitosamente.');
-  console.log('   Ejecuta "npm start" para iniciar el servidor.');
-  process.exit(0);
+  await crearPedido({
+    descripcion: 'Pedido de prueba — suministros oficina',
+    items: [
+      { producto_id: productos['PAP-001'].id, cantidad_solicitada: 100 },
+      { producto_id: productos['MOU-004'].id, cantidad_solicitada: 20 }
+    ]
+  });
+  registrar('✅ 1 pedido de prueba');
 }
 
-seed().catch(err => {
-  console.error('❌ Error en seed:', err);
-  process.exit(1);
-});
+module.exports = { cargarDatosDemo };
+
+if (require.main === module) {
+  cargarDatosDemo(console.log)
+    .then(() => { console.log('🎉 Datos de demo cargados. Ejecuta "npm start".'); process.exit(0); })
+    .catch(err => { console.error('❌ Error en seed:', err); process.exit(1); });
+}
