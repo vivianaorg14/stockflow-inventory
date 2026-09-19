@@ -23,11 +23,12 @@ Formato: [MADR 4.0](https://adr.github.io/madr/) reducido, ver [`template.md`](t
 | [ADR-007](ADR-007-despachos-parciales.md) | Despachos parciales permitidos | Aceptado | 2026-09-18 |
 | [ADR-008](ADR-008-identificacion-de-productos.md) | ID interno + SKU único | Aceptado | 2026-09-18 |
 | [ADR-009](ADR-009-cantidades-enteras.md) | Cantidades enteras positivas | Aceptado | 2026-09-18 |
-| [ADR-010](ADR-010-sin-usuarios-ni-permisos.md) | Sin autenticación ni permisos por bodega en v1 | Aceptado | 2026-09-18 |
+| [ADR-010](ADR-010-sin-usuarios-ni-permisos.md) | Sin autenticación ni permisos por bodega en v1 | **Sustituido por ADR-015** | 2026-09-18 |
 | [ADR-011](ADR-011-api-sin-frontend.md) | API REST sin frontend en v1 | **Sustituido por ADR-013** | 2026-09-18 |
 | [ADR-012](ADR-012-servicios-de-dominio.md) | Reglas de negocio en servicios de dominio | Aceptado | 2026-09-18 |
 | [ADR-013](ADR-013-frontend-estatico.md) | Frontend estático en `public/` servido por Express | Aceptado | 2026-09-18 |
 | [ADR-014](ADR-014-tipo-ajuste.md) | Tipo `AJUSTE` con sentido y motivo obligatorio | Aceptado | 2026-09-18 |
+| [ADR-015](ADR-015-roles-usuarios-y-limite-bodegas.md) | Roles supervisor mayor/menor, JWT, límite de 3 bodegas y balanceo sugerido | Aceptado | 2026-09-19 |
 
 ADR-004 a ADR-010 formalizan las asunciones AS-001 a AS-008 de
 [`../../ASSUMPTIONS.md`](../../ASSUMPTIONS.md); el análisis largo de alternativas del que salieron

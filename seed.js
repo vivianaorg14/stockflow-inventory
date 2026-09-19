@@ -3,9 +3,10 @@
 // Las existencias se crean SOLO a través de movimientos, para que la auditoría
 // de R3 cuadre desde el primer momento (D-02).
 
-const { sincronizar, Producto, Bodega } = require('./src/models');
+const { sincronizar, Producto, Bodega, Usuario } = require('./src/models');
 const { registrarMovimiento, fijarMinimo } = require('./src/servicios/inventario');
 const { crearPedido } = require('./src/servicios/pedidos');
+const { hashPassword } = require('./src/servicios/auth');
 
 // [sku, bodega, entrada inicial, mínimo]. Cuatro pares quedan bajo mínimo a propósito.
 const EXISTENCIAS_INICIALES = [
@@ -77,6 +78,38 @@ async function cargarDatosDemo(registrar = () => {}) {
     ]
   });
   registrar('✅ 1 pedido de prueba');
+
+  await Usuario.bulkCreate([
+    {
+      nombre: 'Carlos Mayor',
+      username: 'carlos.mayor',
+      password_hash: hashPassword('mayor123'),
+      rol: 'supervisor_mayor',
+      bodega_id: null
+    },
+    {
+      nombre: 'Ana Norte',
+      username: 'ana.norte',
+      password_hash: hashPassword('norte123'),
+      rol: 'supervisor_menor',
+      bodega_id: bodegas['Bodega Norte'].id
+    },
+    {
+      nombre: 'Sergio Sur',
+      username: 'sergio.sur',
+      password_hash: hashPassword('sur123'),
+      rol: 'supervisor_menor',
+      bodega_id: bodegas['Bodega Sur'].id
+    },
+    {
+      nombre: 'Camilo Central',
+      username: 'camilo.central',
+      password_hash: hashPassword('central123'),
+      rol: 'supervisor_menor',
+      bodega_id: bodegas['Bodega Central'].id
+    }
+  ]);
+  registrar('✅ 4 usuarios creados (1 mayor + 3 menores)');
 }
 
 module.exports = { cargarDatosDemo };

@@ -207,3 +207,52 @@ pequeñas, cada una con su propio subagente, y cerrar con esta misma entrada.
 - Integrar un proyecto completo a través de commits semánticos y verificables no solo organiza el control de versiones, sino que permite auditar cada componente de forma aislada.
 - Mantener los ADRs organizados y enlazados a la bitácora y asunciones previene discrepancias entre la intención de diseño y la implementación final del sistema.
 - Las pruebas automatizadas que abarcan desde reglas de negocio hasta endpoints HTTP y servicio de archivos estáticos actúan como red de seguridad indispensable en cualquier proceso de integración.
+
+---
+
+## Sesión 5 — 2026-09-19
+
+**Herramienta usada:** Antigravity (Google DeepMind)  
+**Duración aproximada:** ~1 hora  
+**Objetivo de la sesión:** Implementación de la extensión de diseño para roles jerárquicos (`supervisor_mayor` y `supervisor_menor`), autenticación JWT, límite estricto a 3 bodegas y balanceo sugerido de inventario para pedidos.
+
+### Qué pedí
+
+1. Modelar usuarios con dos roles: `supervisor_mayor` (global) y `supervisor_menor` (atado obligatoriamente a una bodega).
+2. Garantizar que en el sistema exista exactamente 1 `supervisor_mayor` y exactamente 1 `supervisor_menor` por cada una de las 3 bodegas.
+3. Implementar autenticación básica mediante JWT sin sobre-ingeniería.
+4. Restringir la operación y consulta de inventario del `supervisor_menor` a su propia bodega asignada (devolviendo HTTP 403 si intenta actuar sobre otra).
+5. Limitar el número de bodegas a exactamente 3 (rechazando con HTTP 400 cualquier intento de crear una 4ª bodega vía API).
+6. Crear una función de balanceo preventivo sugerido (`POST /api/pedidos/:id/sugerir-reparto`) que proponga el reparto multibodega priorizando excedentes sobre el stock mínimo, sin ejecutar despachos ni alterar la base de datos.
+7. Actualizar `seed.js` para sembrar los 4 usuarios iniciales.
+8. Documentar exhaustivamente como extensión de diseño en `README.md`, `ASSUMPTIONS.md`, un nuevo ADR (`ADR-015`) y esta bitácora.
+
+### Qué propuso el agente
+
+- Presentar un plan técnico formal ([`implementation_plan.md`](implementation_plan.md)) antes de escribir código.
+- Implementar la emisión y verificación de JWT (HS256) y el hashing de contraseñas (`scrypt`) utilizando el módulo nativo `crypto` de Node.js, logrando cero dependencias externas adicionales en `package.json`.
+- Restringir la unicidad de los roles tanto con validaciones de modelo Sequelize (hooks `beforeCreate`/`beforeUpdate`) como en la capa de servicios.
+- Desarrollar un algoritmo preventivo de balanceo en `src/servicios/pedidos.js`:
+  - *Fase 1*: Priorizar bodegas con excedente seguro (`cantidad_actual - minimo > 0`).
+  - *Fase 2*: Si no alcanza, asignar del remanente emitiendo advertencias de qué bodegas quedarían bajo mínimo.
+  - *Garantía*: Solo lectura, sin mutación de existencias.
+- Crear una nueva suite de pruebas automatizadas (`tests/roles-auth.test.js`) con 10 pruebas específicas para cubrir todos los nuevos flujos y casos de borde.
+
+### Qué acepté
+
+- El plan de implementación y el uso de `crypto` nativo para máxima portabilidad y velocidad.
+- La lógica de balanceo preventivo sugerido que protege los niveles mínimos de stock.
+- La suite completa de 52 pruebas automatizadas y el paso limpio de `npm run verify` con cobertura superior al 92%.
+- La formalización del [ADR-015](docs/adr/ADR-015-roles-usuarios-y-limite-bodegas.md) en el catálogo de arquitectura.
+
+### Qué rechacé / modifiqué
+
+- Se descartó cualquier despacho automático en la función de balanceo: el sistema únicamente devuelve la sugerencia analítica en JSON para que el `supervisor_mayor` tome la decisión final de despacho.
+- Se mantuvo la compatibilidad con el frontend estático y los 42 tests previos, permitiendo que consultas no autenticadas en modo demo/test mantengan acceso de lectura global.
+
+### Aprendizajes de la sesión
+
+- Diseñar extensiones desacopladas (servicios de dominio + middlewares) permite añadir capas de seguridad y lógica avanzada sin poner en riesgo las reglas contables preexistentes.
+- Las herramientas nativas de la plataforma (como `crypto` en Node.js) muchas veces eliminan la necesidad de dependencias de terceros, reduciendo la superficie de ataque y los problemas de compatibilidad en entornos de evaluación.
+- El balanceo asistido mediante sugerencias auditables respeta el principio de gobierno humano y trazabilidad contable del sistema.
+

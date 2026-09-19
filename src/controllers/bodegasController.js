@@ -19,6 +19,11 @@ const crear = capturar(async (req, res) => {
     throw new ErrorDeNegocio('El nombre de la bodega es obligatorio');
   }
 
+  const totalBodegas = await Bodega.count();
+  if (totalBodegas >= 3) {
+    throw new ErrorDeNegocio('El sistema solo admite 3 bodegas según el alcance definido');
+  }
+
   const bodega = await Bodega.create({ nombre, ubicacion });
   res.status(201).json(bodega);
 });

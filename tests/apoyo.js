@@ -48,4 +48,24 @@ async function existencia(producto_id, bodega_id) {
   return fila ? fila.cantidad_actual : 0;
 }
 
-module.exports = { app, request, prepararBase, crearCatalogoBase, entrada, existencia };
+const { generarToken, hashPassword } = require('../src/servicios/auth');
+
+function tokenSupervisorMayor(id = 1) {
+  return generarToken({ id, username: 'carlos.mayor', rol: 'supervisor_mayor', bodega_id: null });
+}
+
+function tokenSupervisorMenor(bodega_id, id = 2) {
+  return generarToken({ id, username: `supervisor.b${bodega_id}`, rol: 'supervisor_menor', bodega_id });
+}
+
+module.exports = {
+  app,
+  request,
+  prepararBase,
+  crearCatalogoBase,
+  entrada,
+  existencia,
+  tokenSupervisorMayor,
+  tokenSupervisorMenor,
+  hashPassword
+};

@@ -1,7 +1,7 @@
 // src/servicios/pedidos.js
 // Dueño del ciclo de vida del pedido (R2; ADR-005, ADR-006, ADR-007).
 
-const { Pedido, ItemPedido, Producto, Movimiento, sequelize } = require('../models');
+const { Pedido, ItemPedido, Producto, Bodega, ExistenciaPorBodega, Movimiento, sequelize } = require('../models');
 const { ErrorDeNegocio, NoEncontrado } = require('./errores');
 const { validarCantidad, validarId } = require('./validaciones');
 const { ajustarExistencia, exigirBodega } = require('./inventario');
@@ -112,4 +112,109 @@ async function cancelar(pedido_id) {
   return Pedido.findByPk(pedido_id, { include: INCLUIR_ITEMS });
 }
 
-module.exports = { crearPedido, listarPedidos, despachar, cancelar };
+// Balanceo preventivo sugerido (ADR-015):
+// Calcula una propuesta de reparto multibodega sin modificar la base de datos.
+// Prioriza bodegas con excedente disponible sobre su stock mínimo para evitar desabastecimiento.
+async function sugerirReparto(pedido_id) {
+  const pedido = await Pedido.findByPk(pedido_id, { include: INCLUIR_ITEMS });
+  if (!pedido) throw new NoEncontrado(`Pedido ${pedido_id} no encontrado`);
+  exigirAbierto(pedido);
+
+  const bodegas = await Bodega.findAll({ order: [['nombre', 'ASC']] });
+  const propuesta_despacho = [];
+  const advertencias = [];
+
+  for (const item of pedido.items) {
+    let pendiente = item.cantidad_solicitada - item.cantidad_despachada;
+    if (pendiente <= 0) continue;
+
+    // Obtener existencias actuales de este producto en todas las bodegas
+    const existencias = await Promise.all(
+      bodegas.map(async (bodega) => {
+        const fila = await ExistenciaPorBodega.findOne({
+          where: { producto_id: item.producto_id, bodega_id: bodega.id }
+        });
+        const cantidad_actual = fila ? fila.cantidad_actual : 0;
+        const minimo = fila ? fila.minimo : 0;
+        const excedente = Math.max(0, cantidad_actual - minimo);
+        return {
+          bodega_id: bodega.id,
+          bodega_nombre: bodega.nombre,
+          cantidad_actual,
+          minimo,
+          excedente,
+          asignado: 0
+        };
+      })
+    );
+
+    // Fase 1: Asignar del excedente seguro (por encima del mínimo)
+    // Ordenamos por mayor excedente primero
+    existencias.sort((a, b) => b.excedente - a.excedente);
+
+    for (const b of existencias) {
+      if (pendiente <= 0) break;
+      if (b.excedente > 0) {
+        const aSacar = Math.min(pendiente, b.excedente);
+        b.asignado += aSacar;
+        b.excedente -= aSacar;
+        pendiente -= aSacar;
+      }
+    }
+
+    // Fase 2: Si aún queda pendiente, tomar del stock disponible restante (riesgo de quedar bajo mínimo)
+    if (pendiente > 0) {
+      // Ordenamos por stock disponible remanente
+      existencias.sort((a, b) => (b.cantidad_actual - b.asignado) - (a.cantidad_actual - a.asignado));
+
+      for (const b of existencias) {
+        if (pendiente <= 0) break;
+        const disponibleRemanente = b.cantidad_actual - b.asignado;
+        if (disponibleRemanente > 0) {
+          const aSacar = Math.min(pendiente, disponibleRemanente);
+          b.asignado += aSacar;
+          pendiente -= aSacar;
+          advertencias.push(
+            `Para el ítem #${item.id} (${item.producto ? item.producto.nombre : item.producto_id}), ${b.bodega_nombre} quedará con ${b.cantidad_actual - b.asignado} unidades (bajo su mínimo de ${b.minimo})`
+          );
+        }
+      }
+    }
+
+    // Si aún no se cubrió todo
+    if (pendiente > 0) {
+      advertencias.push(
+        `Existencia total insuficiente en toda la red: faltan ${pendiente} unidades para cubrir el ítem #${item.id}`
+      );
+    }
+
+    // Consolidar asignaciones
+    for (const b of existencias) {
+      if (b.asignado > 0) {
+        const stockResultante = b.cantidad_actual - b.asignado;
+        propuesta_despacho.push({
+          item_pedido_id: item.id,
+          producto_id: item.producto_id,
+          producto: item.producto ? item.producto.nombre : undefined,
+          bodega_id: b.bodega_id,
+          bodega: b.bodega_nombre,
+          cantidad: b.asignado,
+          stock_actual: b.cantidad_actual,
+          minimo: b.minimo,
+          stock_resultante: stockResultante,
+          queda_bajo_minimo: stockResultante < b.minimo
+        });
+      }
+    }
+  }
+
+  return {
+    pedido_id: pedido.id,
+    descripcion: pedido.descripcion,
+    criterio: 'Balanceo preventivo: prioriza despachar del excedente sobre el stock mínimo en cada bodega para evitar desabastecimiento.',
+    propuesta_despacho,
+    advertencias
+  };
+}
+
+module.exports = { crearPedido, listarPedidos, despachar, cancelar, sugerirReparto };

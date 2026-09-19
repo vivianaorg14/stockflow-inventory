@@ -9,6 +9,7 @@ const Bodega = require('./Bodega');
 const ExistenciaPorBodega = require('./ExistenciaPorBodega');
 const Movimiento = require('./Movimiento');
 const { Pedido, ItemPedido } = require('./Pedido');
+const Usuario = require('./Usuario');
 
 // --- Relaciones ---
 
@@ -34,6 +35,10 @@ ItemPedido.belongsTo(Pedido, { foreignKey: 'pedido_id', as: 'pedido' });
 // Un ítem de pedido referencia un producto
 ItemPedido.belongsTo(Producto, { foreignKey: 'producto_id', as: 'producto' });
 
+// Un supervisor menor pertenece a una bodega; una bodega tiene su supervisor menor
+Bodega.hasOne(Usuario, { foreignKey: 'bodega_id', as: 'supervisor' });
+Usuario.belongsTo(Bodega, { foreignKey: 'bodega_id', as: 'bodega' });
+
 // Función para sincronizar todos los modelos con la base de datos
 // force: false → no borra tablas existentes (para producción)
 // force: true  → borra y recrea (solo para desarrollo/seeds)
@@ -47,5 +52,6 @@ module.exports = {
   ExistenciaPorBodega,
   Movimiento,
   Pedido,
-  ItemPedido
+  ItemPedido,
+  Usuario
 };

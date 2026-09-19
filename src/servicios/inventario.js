@@ -111,8 +111,13 @@ const ORDEN_PRODUCTO_BODEGA = [
 ];
 
 // Consulta obligatoria del enunciado. bajo_minimo es estrictamente menor (ADR-004).
-async function listarExistencias() {
-  const filas = await ExistenciaPorBodega.findAll({ include: INCLUIR_PRODUCTO_Y_BODEGA, order: ORDEN_PRODUCTO_BODEGA });
+async function listarExistencias(filtroBodegaId = null) {
+  const where = filtroBodegaId ? { bodega_id: filtroBodegaId } : {};
+  const filas = await ExistenciaPorBodega.findAll({
+    where,
+    include: INCLUIR_PRODUCTO_Y_BODEGA,
+    order: ORDEN_PRODUCTO_BODEGA
+  });
   return filas.map(fila => ({
     producto_id: fila.producto_id,
     bodega_id: fila.bodega_id,

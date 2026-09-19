@@ -9,6 +9,15 @@ const bodegasCtrl = require('../controllers/bodegasController');
 const movimientosCtrl = require('../controllers/movimientosController');
 const inventarioCtrl = require('../controllers/inventarioController');
 const pedidosCtrl = require('../controllers/pedidosController');
+const authCtrl = require('../controllers/authController');
+const { autenticar } = require('../middlewares/auth');
+
+// Middleware global de autenticación en /api (permite retrocompatibilidad si no se envía header)
+router.use(autenticar(false));
+
+// --- Autenticación ---
+router.post('/auth/login', authCtrl.login);
+router.get('/auth/perfil', authCtrl.perfil);
 
 // --- Productos ---
 router.get('/productos', productosCtrl.listar);
@@ -32,6 +41,7 @@ router.put('/inventario/existencias/:producto_id/:bodega_id/minimo', inventarioC
 // --- Pedidos ---
 router.get('/pedidos', pedidosCtrl.listar);
 router.post('/pedidos', pedidosCtrl.crear);
+router.post('/pedidos/:id/sugerir-reparto', pedidosCtrl.sugerirReparto);
 router.post('/pedidos/:id/despachar', pedidosCtrl.despachar);
 router.post('/pedidos/:id/cancelar', pedidosCtrl.cancelar);
 

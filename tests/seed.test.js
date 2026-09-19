@@ -29,9 +29,9 @@ test('D-10: no se puede duplicar el par producto-bodega', async () => {
   );
 });
 
-test('M-06: cargarDatosDemo(registrar) reporta 5 mensajes de progreso', async () => {
+test('M-06: cargarDatosDemo(registrar) reporta 6 mensajes de progreso', async () => {
   await prepararBase();
   const mensajes = [];
   await cargarDatosDemo(m => mensajes.push(m));
-  assert.equal(mensajes.length, 5);
+  assert.equal(mensajes.length, 6);
 });

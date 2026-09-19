@@ -15,8 +15,33 @@ una o varias bodegas. Resuelve el problema del enunciado —"el inventario se ll
 de cálculo por bodega y nunca cuadra"— con una única base de datos y una historia de
 movimientos que no se edita.
 
-**Estado:** funcional, con interfaz web y suite de pruebas con cobertura (N2). API REST + frontend estático,
-sin autenticación (ver [limitaciones](#limitaciones-conocidas)).
+**Estado:** funcional, con interfaz web, suite de pruebas (52 casos con cobertura >90%), autenticación JWT y control de acceso basado en roles (RBAC) con límite a 3 bodegas.
+
+## Roles y Usuarios (Extensión de diseño — ADR-015)
+
+> [!NOTE]
+> Esta sección corresponde a una **extensión de diseño** incorporada para enriquecer el sistema con seguridad, control operacional por bodega y balanceo de carga.
+
+El sistema implementa dos roles jerárquicos:
+- **`supervisor_mayor`**: Tiene control global sobre la red de distribución. Puede consultar existencias y auditoría de todas las bodegas, crear pedidos, solicitar propuestas de balanceo automático y despachar desde cualquier bodega. Existe exactamente **1 supervisor mayor**.
+- **`supervisor_menor`**: Administrador local atado exclusivamente a una bodega. Solo puede consultar las existencias de su bodega y únicamente puede despachar o registrar movimientos que involucren su bodega asignada (cualquier intento de operar sobre otra bodega es rechazado con HTTP 403). Existe exactamente **1 supervisor menor por bodega**.
+
+### Usuarios de demostración (cargados en `npm run seed`)
+
+| Usuario | Contraseña | Rol | Bodega Asignada |
+|---|---|---|---|
+| `carlos.mayor` | `mayor123` | `supervisor_mayor` | *(Global — Ninguna)* |
+| `ana.norte` | `norte123` | `supervisor_menor` | Bodega Norte |
+| `sergio.sur` | `sur123` | `supervisor_menor` | Bodega Sur |
+| `camilo.central` | `central123` | `supervisor_menor` | Bodega Central |
+
+### Límite de 3 Bodegas
+El alcance del sistema está estrictamente dimensionado para una red de 3 bodegas. Si se intenta registrar una 4ª bodega vía `POST /api/bodegas`, el servidor responde con **HTTP 400**.
+
+### Función de Balanceo Sugerido (`POST /api/pedidos/:id/sugerir-reparto`)
+Permite al `supervisor_mayor` obtener una propuesta inteligente de cómo repartir un pedido entre las bodegas, priorizando aquellas con mayor excedente sobre su stock mínimo. **Nunca ejecuta el despacho automáticamente**, preservando el criterio de decisión humano.
+
+---
 
 ## Cómo ejecutar desde cero
 
@@ -27,13 +52,12 @@ Nada más (SQLite es un fichero local).
 git clone https://github.com/vivianaorg14/stockflow-inventory.git
 cd stockflow-inventory
 npm install
-npm run seed      # crea stockflow.sqlite con 3 bodegas, 5 productos, 1 pedido de prueba
+npm run seed      # crea stockflow.sqlite con 3 bodegas, 5 productos, 1 pedido y 4 usuarios
 npm start         # http://localhost:3000 (o el PORT de .env; plantilla en .env.example)
 ```
 
 Abrir [http://localhost:3000](http://localhost:3000) en el navegador: interfaz con pestañas de
-Existencias, Movimientos, Pedidos, Auditoría y Catálogo. Sin `curl`, se puede recorrer toda la
-demo desde ahí.
+Existencias, Movimientos, Pedidos, Auditoría y Catálogo.
 
 ### Consulta obligatoria
 
@@ -44,27 +68,28 @@ curl http://localhost:3000/api/inventario/existencias
 ```
 
 Devuelve una fila por par producto–bodega con `cantidad_actual`, `minimo` y `bajo_minimo`.
-Con los datos del seed hay **4 filas** con `bajo_minimo: true`. Formato exacto en
-[docs/02-dominio.md](docs/02-dominio.md#respuesta-de-la-consulta-obligatoria).
+Con los datos del seed hay **4 filas** con `bajo_minimo: true`. Si la consulta la realiza un `supervisor_menor`, los resultados se filtran automáticamente a su bodega asignada.
 
 ### Endpoints
 
-Todas las rutas cuelgan de **`/api`**. Tabla completa con cuerpos de petición en
-[docs/02-dominio.md](docs/02-dominio.md#api); peticiones `curl` listas para la demo en
-[docs/05-runbook.md](docs/05-runbook.md#peticiones-de-demo-defensa-oral).
+Todas las rutas cuelgan de **`/api`**.
 
-| Método | Ruta | Qué hace |
-|---|---|---|
-| `GET` / `POST` | `/api/productos` | Listar / crear productos |
-| `PATCH` | `/api/productos/:id/descontinuar` | Marcar descontinuado (R4) |
-| `GET` / `POST` | `/api/bodegas` | Listar / crear bodegas |
-| `GET` / `POST` | `/api/movimientos` | Historial / registrar entrada, salida o traslado (R1, R3, R4) |
-| `GET` | `/api/inventario/existencias` | **Consulta obligatoria** |
-| `GET` | `/api/inventario/auditoria` | Auditoría de saldos (R3) |
-| `PUT` | `/api/inventario/existencias/:producto_id/:bodega_id/minimo` | Fijar el mínimo de un par producto-bodega |
-| `GET` / `POST` | `/api/pedidos` | Listar / crear pedidos |
-| `POST` | `/api/pedidos/:id/despachar` | Despachar desde una o varias bodegas (R2) |
-| `POST` | `/api/pedidos/:id/cancelar` | Cancelar un pedido abierto |
+| Método | Ruta | Rol requerido / Permisos | Qué hace |
+|---|---|---|---|
+| `POST` | `/api/auth/login` | Público | Autenticación con usuario y contraseña; retorna token JWT |
+| `GET` | `/api/auth/perfil` | Autenticado | Consulta datos y bodega del usuario en sesión |
+| `GET` / `POST` | `/api/productos` | General / Mayor | Listar / crear productos |
+| `PATCH` | `/api/productos/:id/descontinuar` | General / Mayor | Marcar producto descontinuado (R4) |
+| `GET` / `POST` | `/api/bodegas` | General / Mayor | Listar / crear bodegas (máximo 3) |
+| `GET` / `POST` | `/api/movimientos` | Filtrado por rol | Historial / registrar movimiento (menor restringido a su bodega) |
+| `GET` | `/api/inventario/existencias` | Filtrado por rol | **Consulta obligatoria** (menor solo ve su bodega) |
+| `GET` | `/api/inventario/auditoria` | `supervisor_mayor` | Auditoría de saldos vs historia (R3) |
+| `PUT` | `/api/inventario/existencias/:prod/:bod/minimo` | Bodega propia / Mayor | Fijar stock mínimo por par producto-bodega |
+| `GET` | `/api/pedidos` | General | Listar pedidos |
+| `POST` | `/api/pedidos` | `supervisor_mayor` | Crear nuevo pedido |
+| `POST` | `/api/pedidos/:id/sugerir-reparto` | `supervisor_mayor` | Sugerir balanceo de despacho entre bodegas (solo lectura) |
+| `POST` | `/api/pedidos/:id/despachar` | Mayor o Menor (su bodega) | Despachar parcial o totalmente |
+| `POST` | `/api/pedidos/:id/cancelar` | `supervisor_mayor` | Cancelar un pedido abierto |
 
 ## Cómo cumple el enunciado
 
