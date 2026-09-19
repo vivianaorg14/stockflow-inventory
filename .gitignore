@@ -1,2 +1,4 @@
 stockflow.sqlite
 node_modules/
+coverage/
+.env

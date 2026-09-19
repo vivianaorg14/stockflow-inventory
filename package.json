@@ -3,14 +3,29 @@
   "version": "1.0.0",
   "description": "Sistema de gestión de inventario multibodega con trazabilidad de movimientos y despacho de pedidos.",
   "main": "index.js",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "start": "node index.js",
     "seed": "node seed.js",
-    "dev": "node --watch index.js"
+    "dev": "node --watch index.js",
+    "test": "node --test --test-reporter=spec tests/**/*.test.js",
+    "lint": "eslint .",
+    "test:cov": "c8 --reporter=text --reporter=text-summary --lines 90 --functions 90 --branches 80 --statements 90 --include \"src/**\" --include \"seed.js\" npm test",
+    "verify": "npm run lint && npm run test:cov"
   },
   "dependencies": {
+    "dotenv": "^16.6.1",
     "express": "^4.18.2",
     "sequelize": "^6.35.2",
     "sqlite3": "^5.1.6"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "c8": "^10.1.3",
+    "eslint": "^9.39.5",
+    "globals": "^15.15.0",
+    "supertest": "^7.2.2"
   }
 }

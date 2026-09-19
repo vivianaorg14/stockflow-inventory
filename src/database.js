@@ -1,16 +1,14 @@
 // src/database.js
-// Configuración de la conexión a SQLite usando Sequelize.
-// SQLite guarda todo en un archivo local llamado stockflow.sqlite.
-// No se necesita instalar ningún servidor de base de datos.
+// Conexión a SQLite con Sequelize. Por defecto usa el fichero stockflow.sqlite
+// en la raíz (configurable con DB_STORAGE en `.env`); los tests fijan ':memory:' antes de cargar este módulo.
 
 const { Sequelize } = require('sequelize');
-const path = require('path');
+const { almacenamiento } = require('./config');
 
-// El archivo de base de datos se crea en la raíz del proyecto
 const sequelize = new Sequelize({
   dialect: 'sqlite',
-  storage: path.join(__dirname, '..', 'stockflow.sqlite'),
-  logging: false // Cambiar a console.log si quieres ver las queries SQL en consola
+  storage: almacenamiento,
+  logging: false
 });
 
 module.exports = sequelize;
