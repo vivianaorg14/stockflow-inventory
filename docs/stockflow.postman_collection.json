@@ -1,0 +1,144 @@
+{
+  "info": {
+    "name": "StockFlow — peticiones de demo",
+    "description": "Misma secuencia y cuerpos que la sección \"Peticiones de demo\" de docs/05-runbook.md. Requiere un servidor recién sembrado (npm run seed && npm start).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" }
+  ],
+  "item": [
+    {
+      "name": "R1 — traslado OK",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "content-type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"tipo\":\"TRASLADO\",\"producto_id\":1,\"bodega_origen_id\":2,\"bodega_destino_id\":1,\"cantidad\":30}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/movimientos", "host": ["{{baseUrl}}"], "path": ["api", "movimientos"] }
+      }
+    },
+    {
+      "name": "R1 — traslado que dejaría negativo (400)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "content-type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"tipo\":\"TRASLADO\",\"producto_id\":2,\"bodega_origen_id\":3,\"bodega_destino_id\":1,\"cantidad\":999}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/movimientos", "host": ["{{baseUrl}}"], "path": ["api", "movimientos"] }
+      }
+    },
+    {
+      "name": "R4 — entrada a descontinuado (400)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "content-type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"tipo\":\"ENTRADA\",\"producto_id\":5,\"bodega_destino_id\":1,\"cantidad\":1}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/movimientos", "host": ["{{baseUrl}}"], "path": ["api", "movimientos"] }
+      }
+    },
+    {
+      "name": "R4 — salida de descontinuado (201)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "content-type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"tipo\":\"SALIDA\",\"producto_id\":5,\"bodega_origen_id\":1,\"cantidad\":2}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/movimientos", "host": ["{{baseUrl}}"], "path": ["api", "movimientos"] }
+      }
+    },
+    {
+      "name": "AJUSTE — corrección de conteo",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "content-type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"tipo\":\"AJUSTE\",\"sentido\":\"ENTRADA\",\"producto_id\":1,\"bodega_destino_id\":1,\"cantidad\":5,\"notas\":\"conteo fisico\"}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/movimientos", "host": ["{{baseUrl}}"], "path": ["api", "movimientos"] }
+      }
+    },
+    {
+      "name": "D-01/R3 — auditoría de saldos",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/api/inventario/auditoria", "host": ["{{baseUrl}}"], "path": ["api", "inventario", "auditoria"] }
+      }
+    },
+    {
+      "name": "D-09 — fijar mínimo",
+      "request": {
+        "method": "PUT",
+        "header": [{ "key": "content-type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"minimo\":200}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/inventario/existencias/1/1/minimo", "host": ["{{baseUrl}}"], "path": ["api", "inventario", "existencias", "1", "1", "minimo"] }
+      }
+    },
+    {
+      "name": "R2 — despacho multibodega (parcial)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "content-type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"despachos\":[{\"item_pedido_id\":1,\"bodega_id\":1,\"cantidad\":50},{\"item_pedido_id\":1,\"bodega_id\":2,\"cantidad\":50}]}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/pedidos/1/despachar", "host": ["{{baseUrl}}"], "path": ["api", "pedidos", "1", "despachar"] }
+      }
+    },
+    {
+      "name": "R2 — completar ítem 2 (COMPLETADO)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "content-type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"despachos\":[{\"item_pedido_id\":2,\"bodega_id\":1,\"cantidad\":20}]}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/pedidos/1/despachar", "host": ["{{baseUrl}}"], "path": ["api", "pedidos", "1", "despachar"] }
+      }
+    },
+    {
+      "name": "D-04 — crear pedido para cancelar",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "content-type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"descripcion\":\"prueba cancelar\",\"items\":[{\"producto_id\":1,\"cantidad_solicitada\":1}]}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/pedidos", "host": ["{{baseUrl}}"], "path": ["api", "pedidos"] }
+      }
+    },
+    {
+      "name": "D-04 — cancelar pedido (ajustar el id al que devolvió el paso anterior)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/api/pedidos/2/cancelar", "host": ["{{baseUrl}}"], "path": ["api", "pedidos", "2", "cancelar"] }
+      }
+    },
+    {
+      "name": "R3 — historial de movimientos",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/api/movimientos", "host": ["{{baseUrl}}"], "path": ["api", "movimientos"] }
+      }
+    }
+  ]
+}

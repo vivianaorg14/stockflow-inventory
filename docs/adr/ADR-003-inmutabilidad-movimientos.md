@@ -106,3 +106,11 @@ El modelo `Movimiento` en Sequelize no expone métodos de actualización desde l
 > **Pregunta probable:** ¿No es más complejo para el usuario?
 
 **Respuesta preparada:** Sí, requiere que el operador entienda que el sistema es un libro de registros, no una planilla de Excel. Pero esa complejidad protege la integridad de los datos y permite auditar exactamente qué pasó y cuándo.
+
+---
+
+> **Nota 2026-09-18 (posterior a la redacción, no se reescribe lo anterior):** el código real no
+> tiene tipo `AJUSTE`: el ENUM de `Movimiento.tipo` es `ENTRADA | SALIDA | TRASLADO`, y los
+> ajustes se registran como `ENTRADA`/`SALIDA` con el motivo en `notas`. La ruta citada arriba
+> como `controllers/movimientos.js` es `src/controllers/movimientosController.js`. Ver
+> pendiente `D-03` en [06-pendientes](../06-pendientes.md).
