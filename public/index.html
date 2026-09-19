@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>StockFlow — Inventario multibodega</title>
+  <link rel="stylesheet" href="estilos.css">
+  <link rel="icon" href="data:,">
+</head>
+<body>
+  <header>
+    <h1>StockFlow</h1>
+    <nav>
+      <button data-pestana="existencias" class="activa">Existencias</button>
+      <button data-pestana="movimientos">Movimientos</button>
+      <button data-pestana="pedidos">Pedidos</button>
+      <button data-pestana="auditoria">Auditoría</button>
+      <button data-pestana="catalogo">Catálogo</button>
+    </nav>
+  </header>
+
+  <div id="aviso" class="aviso oculto"></div>
+
+  <main>
+    <section id="existencias" class="pestana">
+      <h2>Existencias por producto y bodega</h2>
+      <label>Bodega: <select id="filtro-bodega"><option value="">Todas</option></select></label>
+      <table>
+        <thead><tr><th>Producto</th><th>SKU</th><th>Estado</th><th>Bodega</th><th>Actual</th><th>Mínimo</th><th></th></tr></thead>
+        <tbody id="tabla-existencias"></tbody>
+      </table>
+    </section>
+
+    <section id="movimientos" class="pestana oculto">
+      <h2>Registrar movimiento</h2>
+      <form id="form-movimiento" class="formulario">
+        <label>Tipo
+          <select name="tipo" required>
+            <option value="ENTRADA">Entrada</option>
+            <option value="SALIDA">Salida</option>
+            <option value="TRASLADO">Traslado</option>
+            <option value="AJUSTE">Ajuste</option>
+          </select>
+        </label>
+        <label id="campo-sentido" class="oculto">Sentido
+          <select name="sentido"><option value="ENTRADA">Suma</option><option value="SALIDA">Resta</option></select>
+        </label>
+        <label>Producto <select name="producto_id" class="select-producto" required></select></label>
+        <label id="campo-origen">Bodega origen <select name="bodega_origen_id" class="select-bodega"></select></label>
+        <label id="campo-destino">Bodega destino <select name="bodega_destino_id" class="select-bodega"></select></label>
+        <label>Cantidad <input name="cantidad" type="number" min="1" step="1" required></label>
+        <label>Notas <input name="notas" type="text"></label>
+        <button type="submit">Registrar</button>
+      </form>
+      <h2>Historial</h2>
+      <table>
+        <thead><tr><th>Fecha</th><th>Tipo</th><th>Producto</th><th>Origen</th><th>Destino</th><th>Cantidad</th><th>Notas</th></tr></thead>
+        <tbody id="tabla-movimientos"></tbody>
+      </table>
+    </section>
+
+    <section id="pedidos" class="pestana oculto">
+      <h2>Nuevo pedido</h2>
+      <form id="form-pedido" class="formulario">
+        <label>Descripción <input name="descripcion" type="text"></label>
+        <div id="items-pedido"></div>
+        <button type="button" id="agregar-item">+ ítem</button>
+        <button type="submit">Crear pedido</button>
+      </form>
+      <h2>Pedidos</h2>
+      <div id="lista-pedidos"></div>
+    </section>
+
+    <section id="auditoria" class="pestana oculto">
+      <h2>Auditoría de saldos (R3)</h2>
+      <p id="resumen-auditoria"></p>
+      <table>
+        <thead><tr><th>Producto</th><th>SKU</th><th>Bodega</th><th>Saldo actual</th><th>Σ historia</th><th>Cuadra</th></tr></thead>
+        <tbody id="tabla-auditoria"></tbody>
+      </table>
+    </section>
+
+    <section id="catalogo" class="pestana oculto">
+      <div class="dos-columnas">
+        <div>
+          <h2>Productos</h2>
+          <form id="form-producto" class="formulario">
+            <label>SKU <input name="sku" required></label>
+            <label>Nombre <input name="nombre" required></label>
+            <label>Descripción <input name="descripcion"></label>
+            <button type="submit">Crear producto</button>
+          </form>
+          <table>
+            <thead><tr><th>SKU</th><th>Nombre</th><th>Estado</th><th></th></tr></thead>
+            <tbody id="tabla-productos"></tbody>
+          </table>
+        </div>
+        <div>
+          <h2>Bodegas</h2>
+          <form id="form-bodega" class="formulario">
+            <label>Nombre <input name="nombre" required></label>
+            <label>Ubicación <input name="ubicacion"></label>
+            <button type="submit">Crear bodega</button>
+          </form>
+          <table>
+            <thead><tr><th>Nombre</th><th>Ubicación</th></tr></thead>
+            <tbody id="tabla-bodegas"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
