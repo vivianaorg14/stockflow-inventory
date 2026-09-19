@@ -1,32 +1,26 @@
 // src/controllers/bodegasController.js
-// Lógica de negocio para crear y consultar bodegas.
+// Traduce HTTP ↔ modelo Bodega. Sin try/catch: capturar() reenvía al manejador de errores.
 
 const { Bodega } = require('../models');
+const { capturar } = require('./http');
+const { ErrorDeNegocio } = require('../servicios/errores');
 
 // GET /bodegas — devuelve todas las bodegas
-const listar = async (req, res) => {
-  try {
-    const bodegas = await Bodega.findAll({ order: [['nombre', 'ASC']] });
-    res.json(bodegas);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
+const listar = capturar(async (req, res) => {
+  const bodegas = await Bodega.findAll({ order: [['nombre', 'ASC']] });
+  res.json(bodegas);
+});
 
 // POST /bodegas — crea una bodega nueva
-const crear = async (req, res) => {
-  try {
-    const { nombre, ubicacion } = req.body;
+const crear = capturar(async (req, res) => {
+  const { nombre, ubicacion } = req.body;
 
-    if (!nombre) {
-      return res.status(400).json({ error: 'El nombre de la bodega es obligatorio' });
-    }
-
-    const bodega = await Bodega.create({ nombre, ubicacion });
-    res.status(201).json(bodega);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+  if (!nombre) {
+    throw new ErrorDeNegocio('El nombre de la bodega es obligatorio');
   }
-};
+
+  const bodega = await Bodega.create({ nombre, ubicacion });
+  res.status(201).json(bodega);
+});
 
 module.exports = { listar, crear };
