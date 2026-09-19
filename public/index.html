@@ -17,6 +17,16 @@
       <button data-pestana="auditoria">Auditoría</button>
       <button data-pestana="catalogo">Catálogo</button>
     </nav>
+    <div id="panel-sesion" class="panel-sesion">
+      <label for="select-usuario-activo">👤 Sesión activa:</label>
+      <select id="select-usuario-activo">
+        <option value="carlos.mayor:mayor123">Carlos Mayor (Supervisor Mayor)</option>
+        <option value="ana.norte:norte123">Ana Norte (Supervisor Menor - Bodega Norte)</option>
+        <option value="sergio.sur:sur123">Sergio Sur (Supervisor Menor - Bodega Sur)</option>
+        <option value="camilo.central:central123">Camilo Central (Supervisor Menor - Bodega Central)</option>
+      </select>
+      <span id="badge-sesion" class="badge-sesion mayor">Mayor</span>
+    </div>
   </header>
 
   <div id="aviso" class="aviso oculto"></div>

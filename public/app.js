@@ -6,17 +6,55 @@ const $$ = (selector) => Array.from(document.querySelectorAll(selector));
 
 let catalogo = { productos: [], bodegas: [] };
 
+let sesionActual = {
+  token: null,
+  usuario: null
+};
+
 // ---------- infraestructura ----------
 
 async function api(ruta, opciones = {}) {
+  const headers = { 'Content-Type': 'application/json', ...(opciones.headers || {}) };
+  if (sesionActual.token) {
+    headers['Authorization'] = `Bearer ${sesionActual.token}`;
+  }
   const respuesta = await fetch(`/api${ruta}`, {
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     ...opciones,
     body: opciones.body ? JSON.stringify(opciones.body) : undefined
   });
   const cuerpo = respuesta.status === 204 ? null : await respuesta.json();
   if (!respuesta.ok) throw new Error(cuerpo?.error || `HTTP ${respuesta.status}`);
   return cuerpo;
+}
+
+async function iniciarSesion(username, password) {
+  const data = await api('/auth/login', {
+    method: 'POST',
+    body: { username, password }
+  });
+  sesionActual = {
+    token: data.token,
+    usuario: data.usuario
+  };
+  actualizarUIUsuario();
+  return sesionActual;
+}
+
+function actualizarUIUsuario() {
+  const badge = $('#badge-sesion');
+  if (!badge || !sesionActual.usuario) return;
+  const esMayor = sesionActual.usuario.rol === 'supervisor_mayor';
+  badge.textContent = esMayor ? '👑 Mayor' : `🏢 Menor (${sesionActual.usuario.bodega?.nombre || 'Bodega ' + sesionActual.usuario.bodega_id})`;
+  badge.className = `badge-sesion ${esMayor ? 'mayor' : 'menor'}`;
+
+  // Ocultar creación de pedidos si es supervisor menor
+  const formPedido = $('#form-pedido');
+  if (formPedido) {
+    formPedido.style.display = esMayor ? 'flex' : 'none';
+    const tituloNuevo = formPedido.previousElementSibling;
+    if (tituloNuevo && tituloNuevo.tagName === 'H2') tituloNuevo.style.display = esMayor ? 'block' : 'none';
+  }
 }
 
 function avisar(mensaje, esError = true) {
@@ -193,9 +231,13 @@ $('#form-pedido').addEventListener('submit', (evento) => {
 function htmlItemPedido(pedido, item) {
   const pendiente = item.cantidad_solicitada - item.cantidad_despachada;
   const abierto = pedido.estado === 'PENDIENTE' || pedido.estado === 'PARCIALMENTE_DESPACHADO';
+  const bodegasOpciones = (sesionActual.usuario && sesionActual.usuario.rol === 'supervisor_menor')
+    ? catalogo.bodegas.filter(b => Number(b.id) === Number(sesionActual.usuario.bodega_id))
+    : catalogo.bodegas;
+
   const formulario = abierto && pendiente > 0 ? `
     <div class="fila-despacho" data-item="${item.id}">
-      <select class="despacho-bodega">${opciones(catalogo.bodegas, b => b.nombre)}</select>
+      <select class="despacho-bodega">${opciones(bodegasOpciones, b => b.nombre)}</select>
       <input type="number" class="despacho-cantidad" min="1" max="${pendiente}" step="1" placeholder="cantidad">
       <button type="button" class="secundario agregar-despacho">+ bodega</button>
     </div>` : '';
@@ -205,13 +247,19 @@ function htmlItemPedido(pedido, item) {
 async function renderizarPedidos() {
   if ($('#items-pedido').children.length === 0) agregarFilaItem();
   const pedidos = await api('/pedidos');
+  const esMayor = sesionActual.usuario && sesionActual.usuario.rol === 'supervisor_mayor';
+
   $('#lista-pedidos').innerHTML = pedidos.map(p => {
     const abierto = p.estado === 'PENDIENTE' || p.estado === 'PARCIALMENTE_DESPACHADO';
     return `
     <div class="pedido" data-pedido="${p.id}">
       <h3>#${p.id} ${escapar(p.descripcion ?? '')} <span class="estado ${escapar(p.estado)}">${escapar(p.estado)}</span></h3>
       <ul>${p.items.map(i => htmlItemPedido(p, i)).join('')}</ul>
-      ${abierto ? `<button class="despachar">Despachar lo indicado</button> <button class="peligro cancelar">Cancelar pedido</button>` : ''}
+      <div class="contenedor-balanceo"></div>
+      ${abierto ? `
+        <button class="despachar">Despachar lo indicado</button>
+        ${esMayor ? '<button class="secundario sugerir-balanceo">💡 Sugerir balanceo</button> <button class="peligro cancelar">Cancelar pedido</button>' : ''}
+      ` : ''}
     </div>`;
   }).join('') || '<p>Sin pedidos</p>';
 }
@@ -236,6 +284,27 @@ $('#lista-pedidos').addEventListener('click', (evento) => {
     return;
   }
 
+  if (evento.target.classList.contains('sugerir-balanceo')) {
+    ejecutar(async () => {
+      const sugerencia = await api(`/pedidos/${pedidoId}/sugerir-reparto`, { method: 'POST' });
+      const contenedor = tarjeta.querySelector('.contenedor-balanceo');
+      let html = `<div class="caja-balanceo">
+        <h4>💡 Propuesta de balanceo de inventario (solo lectura):</h4>
+        <p><em>${escapar(sugerencia.criterio)}</em></p>
+        <ul>
+          ${sugerencia.propuesta_despacho.map(p => `
+            <li><strong>${escapar(p.bodega)}</strong>: despachar <strong>${p.cantidad}</strong> unidades de ${escapar(p.producto || 'ítem #' + p.item_pedido_id)} (stock resultante: ${p.stock_resultante}, mín: ${p.minimo}) ${p.queda_bajo_minimo ? '⚠️' : '✅'}</li>
+          `).join('')}
+        </ul>`;
+      if (sugerencia.advertencias && sugerencia.advertencias.length > 0) {
+        html += `<div class="advertencia">⚠️ Advertencias:</div><ul>${sugerencia.advertencias.map(a => `<li>${escapar(a)}</li>`).join('')}</ul>`;
+      }
+      html += `</div>`;
+      contenedor.innerHTML = html;
+    });
+    return;
+  }
+
   if (evento.target.classList.contains('despachar')) {
     const despachos = $$(`.pedido[data-pedido="${pedidoId}"] .despachos-pendientes div`).map(linea => ({
       item_pedido_id: Number(linea.parentElement.dataset.item),
@@ -254,6 +323,12 @@ $('#lista-pedidos').addEventListener('click', (evento) => {
 // ---------- auditoría ----------
 
 async function renderizarAuditoria() {
+  if (sesionActual.usuario && sesionActual.usuario.rol === 'supervisor_menor') {
+    $('#resumen-auditoria').textContent = '⚠️ Acceso restringido: Los reportes de auditoría están reservados para el Supervisor Mayor.';
+    $('#tabla-auditoria').innerHTML = '<tr><td colspan="6" style="text-align: center; color: #888;">No tienes permisos para consultar la auditoría global.</td></tr>';
+    return;
+  }
+
   const auditoria = await api('/inventario/auditoria');
   $('#resumen-auditoria').textContent = auditoria.descuadradas === 0
     ? `Las ${auditoria.total} existencias cuadran con su historia de movimientos.`
@@ -294,4 +369,20 @@ $('#form-bodega').addEventListener('submit', (evento) => {
 // ---------- arranque ----------
 
 $$('nav button').forEach(b => b.addEventListener('click', () => activarPestana(b.dataset.pestana)));
+
+const selectUsuario = $('#select-usuario-activo');
+if (selectUsuario) {
+  selectUsuario.addEventListener('change', async (e) => {
+    const [username, password] = e.target.value.split(':');
+    await ejecutar(async () => {
+      await iniciarSesion(username, password);
+      avisar(`Sesión activa: ${sesionActual.usuario.nombre} (${sesionActual.usuario.rol})`, false);
+    });
+  });
+
+  // Autenticar inicialmente con el usuario seleccionado
+  const [uInicial, pInicial] = selectUsuario.value.split(':');
+  iniciarSesion(uInicial, pInicial).catch(() => {});
+}
+
 activarPestana('existencias');
