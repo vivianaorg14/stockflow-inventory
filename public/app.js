@@ -585,6 +585,31 @@ $('#lista-pedidos').addEventListener('click', (evento) => {
       bodega_id: Number(linea.dataset.bodega),
       cantidad: Number(linea.dataset.cantidad)
     }));
+
+    // Capturar también cantidades escritas directamente en los inputs de cada ítem
+    // (esencial para supervisor_menor que no cuenta con botón "+ bodega")
+    $$(`.pedido[data-pedido="${pedidoId}"] .fila-despacho`).forEach(fila => {
+      const cantidadInput = fila.querySelector('.despacho-cantidad');
+      const cantidad = Number(cantidadInput?.value);
+      if (cantidad > 0) {
+        const bodegaSelect = fila.querySelector('.despacho-bodega');
+        const bodegaId = Number(bodegaSelect?.value || sesionActual.usuario?.bodega_id);
+        const itemId = Number(fila.dataset.item);
+        if (itemId && bodegaId) {
+          despachos.push({
+            item_pedido_id: itemId,
+            bodega_id: bodegaId,
+            cantidad
+          });
+        }
+      }
+    });
+
+    if (despachos.length === 0) {
+      avisar('Debes ingresar al menos una cantidad a despachar');
+      return;
+    }
+
     ejecutar(() => api(`/pedidos/${pedidoId}/despachar`, { method: 'POST', body: { despachos } }), 'Despacho registrado');
     return;
   }
