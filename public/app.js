@@ -169,6 +169,13 @@ function datosDeFormulario(formulario) {
   for (const [clave, valor] of new FormData(formulario)) {
     if (valor !== '') datos[clave] = valor;
   }
+  // FormData ignora elementos disabled por especificación HTML estándar.
+  // Los capturamos explícitamente para campos bloqueados como bodega fija:
+  for (const el of formulario.querySelectorAll('input[disabled], select[disabled], textarea[disabled]')) {
+    if (el.name && el.value !== '' && datos[el.name] === undefined) {
+      datos[el.name] = el.value;
+    }
+  }
   for (const campo of ['producto_id', 'bodega_origen_id', 'bodega_destino_id', 'cantidad']) {
     if (datos[campo] !== undefined) datos[campo] = Number(datos[campo]);
   }
@@ -408,6 +415,14 @@ $('#form-movimiento [name=sentido]').addEventListener('change', ajustarCamposMov
 $('#form-movimiento').addEventListener('submit', (evento) => {
   evento.preventDefault();
   const datos = datosDeFormulario(evento.target);
+
+  // Si el usuario es supervisor_menor, garantizar que su bodega asignada viaje siempre
+  if (sesionActual.usuario && sesionActual.usuario.rol === 'supervisor_menor') {
+    const miBodega = Number(sesionActual.usuario.bodega_id);
+    if (datos.tipo === 'ENTRADA') datos.bodega_destino_id = miBodega;
+    if (datos.tipo === 'SALIDA') datos.bodega_origen_id = miBodega;
+  }
+
   if ($('#campo-origen').classList.contains('oculto')) delete datos.bodega_origen_id;
   if ($('#campo-destino').classList.contains('oculto')) delete datos.bodega_destino_id;
   if (datos.tipo !== 'AJUSTE') delete datos.sentido;
