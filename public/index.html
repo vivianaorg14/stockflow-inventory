@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="es">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,6 +9,7 @@
   <link rel="icon" href="data:,">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
+
 <body>
   <header>
     <h1>StockFlow</h1>
@@ -38,25 +40,17 @@
         <div id="error-login" class="aviso-error oculto"></div>
 
         <label for="input-username">Usuario
-          <input type="text" id="input-username" name="username" placeholder="ej. carlos.mayor" required autocomplete="username">
+          <input type="text" id="input-username" name="username" placeholder="ej. carlos.mayor" required
+            autocomplete="username">
         </label>
 
         <label for="input-password">Contraseña
-          <input type="password" id="input-password" name="password" placeholder="••••••••" required autocomplete="current-password">
+          <input type="password" id="input-password" name="password" placeholder="••••••••" required
+            autocomplete="current-password">
         </label>
 
         <button type="submit" class="btn-login" id="btn-iniciar-sesion">Iniciar sesión</button>
       </form>
-
-      <details class="credenciales-demo">
-        <summary>ℹ️ Credenciales de demostración</summary>
-        <div class="lista-credenciales">
-          <p><strong>Supervisor Mayor:</strong> <code>carlos.mayor</code> / <code>mayor123</code> (Acceso global)</p>
-          <p><strong>Supervisor Menor Norte:</strong> <code>ana.norte</code> / <code>norte123</code></p>
-          <p><strong>Supervisor Menor Sur:</strong> <code>sergio.sur</code> / <code>sur123</code></p>
-          <p><strong>Supervisor Menor Central:</strong> <code>camilo.central</code> / <code>central123</code></p>
-        </div>
-      </details>
     </div>
   </div>
 
@@ -79,9 +73,21 @@
 
     <section id="existencias" class="pestana">
       <h2>Existencias por producto y bodega</h2>
-      <label>Bodega: <select id="filtro-bodega"><option value="">Todas</option></select></label>
+      <label>Bodega: <select id="filtro-bodega">
+          <option value="">Todas</option>
+        </select></label>
       <table>
-        <thead><tr><th>Producto</th><th>SKU</th><th>Estado</th><th>Bodega</th><th>Actual</th><th>Mínimo</th><th></th></tr></thead>
+        <thead>
+          <tr>
+            <th>Producto</th>
+            <th>SKU</th>
+            <th>Estado</th>
+            <th>Bodega</th>
+            <th>Actual</th>
+            <th>Mínimo</th>
+            <th></th>
+          </tr>
+        </thead>
         <tbody id="tabla-existencias"></tbody>
       </table>
     </section>
@@ -99,11 +105,15 @@
             </select>
           </label>
           <label id="campo-sentido" class="oculto">Sentido
-            <select name="sentido"><option value="ENTRADA">Suma</option><option value="SALIDA">Resta</option></select>
+            <select name="sentido">
+              <option value="ENTRADA">Suma</option>
+              <option value="SALIDA">Resta</option>
+            </select>
           </label>
           <label>Producto <select name="producto_id" class="select-producto" required></select></label>
           <label id="campo-origen">Bodega origen <select name="bodega_origen_id" class="select-bodega"></select></label>
-          <label id="campo-destino">Bodega destino <select name="bodega_destino_id" class="select-bodega"></select></label>
+          <label id="campo-destino">Bodega destino <select name="bodega_destino_id"
+              class="select-bodega"></select></label>
           <label>Cantidad <input name="cantidad" type="number" min="1" step="1" required></label>
           <label>Notas <input name="notas" type="text"></label>
           <button type="submit">Registrar</button>
@@ -111,7 +121,17 @@
       </div>
       <h2>Historial</h2>
       <table>
-        <thead><tr><th>Fecha</th><th>Tipo</th><th>Producto</th><th>Origen</th><th>Destino</th><th>Cantidad</th><th>Notas</th></tr></thead>
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Tipo</th>
+            <th>Producto</th>
+            <th>Origen</th>
+            <th>Destino</th>
+            <th>Cantidad</th>
+            <th>Notas</th>
+          </tr>
+        </thead>
         <tbody id="tabla-movimientos"></tbody>
       </table>
     </section>
@@ -132,7 +152,16 @@
       <h2>Auditoría de saldos (R3)</h2>
       <p id="resumen-auditoria"></p>
       <table>
-        <thead><tr><th>Producto</th><th>SKU</th><th>Bodega</th><th>Saldo actual</th><th>Σ historia</th><th>Cuadra</th></tr></thead>
+        <thead>
+          <tr>
+            <th>Producto</th>
+            <th>SKU</th>
+            <th>Bodega</th>
+            <th>Saldo actual</th>
+            <th>Σ historia</th>
+            <th>Cuadra</th>
+          </tr>
+        </thead>
         <tbody id="tabla-auditoria"></tbody>
       </table>
     </section>
@@ -150,14 +179,26 @@
             </form>
           </div>
           <table>
-            <thead><tr><th>SKU</th><th>Nombre</th><th>Estado</th><th></th></tr></thead>
+            <thead>
+              <tr>
+                <th>SKU</th>
+                <th>Nombre</th>
+                <th>Estado</th>
+                <th></th>
+              </tr>
+            </thead>
             <tbody id="tabla-productos"></tbody>
           </table>
         </div>
         <div>
           <h2>Bodegas</h2>
           <table>
-            <thead><tr><th>Nombre</th><th>Ubicación</th></tr></thead>
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Ubicación</th>
+              </tr>
+            </thead>
             <tbody id="tabla-bodegas"></tbody>
           </table>
         </div>
@@ -167,4 +208,5 @@
 
   <script src="app.js"></script>
 </body>
+
 </html>
