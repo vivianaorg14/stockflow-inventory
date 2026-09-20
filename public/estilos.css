@@ -28,7 +28,7 @@ button.peligro { background: #fff; color: var(--alerta-texto); border-color: var
 .estado.PARCIALMENTE_DESPACHADO { background: #fff4e5; color: #8a4b00; }
 .fila-despacho { display: flex; gap: 8px; align-items: center; margin: 4px 0; }
 .dos-columnas { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-@media (max-width: 800px) { .dos-columnas { grid-template-columns: 1fr; } }
+@media (max-width: 800px) { .dos-columnas, .grid-graficos { grid-template-columns: 1fr; } }
 
 /* Panel de sesión y roles */
 .panel-sesion { margin-left: auto; display: flex; align-items: center; gap: 10px; font-size: 13px; background: rgba(255,255,255,0.15); padding: 4px 12px; border-radius: 6px; }
@@ -68,7 +68,6 @@ button.peligro { background: #fff; color: var(--alerta-texto); border-color: var
 .grid-graficos { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 14px; }
 .tarjeta-grafico { background: #fff; border: 1px solid var(--borde); border-radius: 6px; padding: 16px; box-shadow: 0 2px 6px rgba(0,0,0,0.03); }
 .tarjeta-grafico h3 { margin: 0 0 12px 0; font-size: 14px; color: var(--primario); }
-.tarjeta-grafico-ancha { grid-column: 1 / -1; }
 .canvas-wrapper { position: relative; height: 260px; width: 100%; }
 
 /* Ayuda visual de stock disponible en nuevo pedido */

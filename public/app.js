@@ -298,34 +298,7 @@ async function renderizarDashboard() {
     });
   }
 
-  // 2. Productos bajo mínimo por bodega
-  const bajoMinPorBodega = idsBodegas.map(id => {
-    return existencias.filter(e => Number(e.bodega_id) === Number(id) && e.bajo_minimo).length;
-  });
-
-  const ctxBajoMin = $('#grafico-bajo-minimo');
-  if (ctxBajoMin && window.Chart) {
-    graficosInstancias['bajoMin'] = new window.Chart(ctxBajoMin, {
-      type: 'bar',
-      data: {
-        labels: nombresBodegas,
-        datasets: [{
-          label: 'Productos bajo mínimo',
-          data: bajoMinPorBodega,
-          backgroundColor: ['#dc2626', '#ea580c', '#f59e0b'],
-          borderRadius: 4
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
-      }
-    });
-  }
-
-  // 3. Movimientos recientes por bodega (Entradas vs Salidas)
+  // 2. Movimientos recientes por bodega (Entradas vs Salidas)
   const entradasPorBodega = idsBodegas.map(id => {
     return movimientos
       .filter(m => (m.tipo === 'ENTRADA' && Number(m.bodega_destino_id) === Number(id)) ||
