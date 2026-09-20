@@ -111,6 +111,20 @@ function actualizarUIUsuario() {
     const tituloNuevo = formPedido.previousElementSibling;
     if (tituloNuevo && tituloNuevo.tagName === 'H2') tituloNuevo.style.display = esMayor ? 'block' : 'none';
   }
+
+  // Punto 4: ocultar pestaña Auditoría para supervisor_menor
+  const btnAuditoria = $('nav button[data-pestana="auditoria"]');
+  if (btnAuditoria) {
+    btnAuditoria.style.display = esMayor ? '' : 'none';
+  }
+
+  // Punto 1: ocultar selector de bodega en existencias para supervisor_menor
+  // (el backend ya filtra por bodega asignada; el selector no tiene sentido)
+  const contenedorFiltro = $('#filtro-bodega');
+  if (contenedorFiltro) {
+    const labelFiltro = contenedorFiltro.closest('label');
+    if (labelFiltro) labelFiltro.style.display = esMayor ? '' : 'none';
+  }
 }
 
 function avisar(mensaje, esError = true) {
@@ -185,6 +199,11 @@ async function refrescarPestanaActiva() {
 }
 
 function activarPestana(nombre) {
+  // Punto 4: bloquear acceso directo a auditoría para supervisor_menor
+  if (nombre === 'auditoria' && sesionActual.usuario && sesionActual.usuario.rol === 'supervisor_menor') {
+    avisar('Acceso denegado: la auditoría es exclusiva del Supervisor Mayor');
+    nombre = 'existencias';
+  }
   $$('nav button').forEach(b => b.classList.toggle('activa', b.dataset.pestana === nombre));
   $$('.pestana').forEach(s => s.classList.toggle('oculto', s.id !== nombre));
   refrescarPestanaActiva().catch(e => avisar(e.message));
@@ -226,6 +245,27 @@ function ajustarCamposMovimiento() {
   $('#campo-origen').classList.toggle('oculto', !usaOrigen);
   $('#campo-destino').classList.toggle('oculto', !usaDestino);
   $('#form-movimiento [name=notas]').required = tipo === 'AJUSTE';
+
+  // Punto 2: para supervisor_menor, fijar la bodega en ENTRADA/SALIDA, liberar en TRASLADO/AJUSTE
+  const esMenor = sesionActual.usuario && sesionActual.usuario.rol === 'supervisor_menor';
+  const miBodegaId = esMenor ? sesionActual.usuario.bodega_id : null;
+  const fijarBodega = esMenor && (tipo === 'ENTRADA' || tipo === 'SALIDA');
+
+  const selectOrigen = $('#form-movimiento [name=bodega_origen_id]');
+  const selectDestino = $('#form-movimiento [name=bodega_destino_id]');
+
+  if (fijarBodega) {
+    // ENTRADA o SALIDA: solo su bodega, bloqueado
+    const miBodega = catalogo.bodegas.find(b => Number(b.id) === Number(miBodegaId));
+    const htmlFijo = miBodega ? `<option value="${miBodega.id}">${escapar(miBodega.nombre)}</option>` : '';
+    if (selectOrigen) { selectOrigen.innerHTML = htmlFijo; selectOrigen.disabled = true; }
+    if (selectDestino) { selectDestino.innerHTML = htmlFijo; selectDestino.disabled = true; }
+  } else {
+    // TRASLADO o AJUSTE (o supervisor_mayor): todas las bodegas disponibles
+    const htmlTodas = opciones(catalogo.bodegas, b => b.nombre);
+    if (selectOrigen) { selectOrigen.innerHTML = htmlTodas; selectOrigen.disabled = false; }
+    if (selectDestino) { selectDestino.innerHTML = htmlTodas; selectDestino.disabled = false; }
+  }
 }
 
 $('#form-movimiento [name=tipo]').addEventListener('change', ajustarCamposMovimiento);
@@ -287,15 +327,21 @@ $('#form-pedido').addEventListener('submit', (evento) => {
 function htmlItemPedido(pedido, item) {
   const pendiente = item.cantidad_solicitada - item.cantidad_despachada;
   const abierto = pedido.estado === 'PENDIENTE' || pedido.estado === 'PARCIALMENTE_DESPACHADO';
+  const esMayor = sesionActual.usuario && sesionActual.usuario.rol === 'supervisor_mayor';
   const bodegasOpciones = (sesionActual.usuario && sesionActual.usuario.rol === 'supervisor_menor')
     ? catalogo.bodegas.filter(b => Number(b.id) === Number(sesionActual.usuario.bodega_id))
     : catalogo.bodegas;
+
+  // Punto 3: el botón "+ bodega" solo es visible para supervisor_mayor
+  const botonAgregarBodega = esMayor
+    ? '<button type="button" class="secundario agregar-despacho">+ bodega</button>'
+    : '';
 
   const formulario = abierto && pendiente > 0 ? `
     <div class="fila-despacho" data-item="${item.id}">
       <select class="despacho-bodega">${opciones(bodegasOpciones, b => b.nombre)}</select>
       <input type="number" class="despacho-cantidad" min="1" max="${pendiente}" step="1" placeholder="cantidad">
-      <button type="button" class="secundario agregar-despacho">+ bodega</button>
+      ${botonAgregarBodega}
     </div>` : '';
   return `<li>${escapar(item.producto?.sku)} — ${escapar(item.producto?.nombre)}: solicitado ${item.cantidad_solicitada}, despachado ${item.cantidad_despachada}, pendiente ${pendiente}${formulario}<div class="despachos-pendientes" data-item="${item.id}"></div></li>`;
 }
@@ -415,11 +461,6 @@ $('#tabla-productos').addEventListener('click', (evento) => {
 $('#form-producto').addEventListener('submit', (evento) => {
   evento.preventDefault();
   ejecutar(async () => { await api('/productos', { method: 'POST', body: datosDeFormulario(evento.target) }); evento.target.reset(); }, 'Producto creado');
-});
-
-$('#form-bodega').addEventListener('submit', (evento) => {
-  evento.preventDefault();
-  ejecutar(async () => { await api('/bodegas', { method: 'POST', body: datosDeFormulario(evento.target) }); evento.target.reset(); }, 'Bodega creada');
 });
 
 // ---------- arranque ----------
