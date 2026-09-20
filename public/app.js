@@ -4,6 +4,8 @@
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => Array.from(document.querySelectorAll(selector));
 
+const CLAVE_STORAGE = 'stockflow_token';
+
 let catalogo = { productos: [], bodegas: [] };
 
 let sesionActual = {
@@ -23,9 +25,47 @@ async function api(ruta, opciones = {}) {
     ...opciones,
     body: opciones.body ? JSON.stringify(opciones.body) : undefined
   });
+  if (respuesta.status === 401 && sesionActual.token) {
+    cerrarSesion();
+    throw new Error('Sesión expirada o inválida. Inicie sesión nuevamente.');
+  }
   const cuerpo = respuesta.status === 204 ? null : await respuesta.json();
   if (!respuesta.ok) throw new Error(cuerpo?.error || `HTTP ${respuesta.status}`);
   return cuerpo;
+}
+
+function mostrarLogin(mensajeError = null) {
+  const pantallaLogin = $('#pantalla-login');
+  const main = $('main');
+  const nav = $('header nav');
+  const panelSesion = $('#panel-sesion');
+  const errorBox = $('#error-login');
+
+  if (pantallaLogin) pantallaLogin.classList.remove('oculto');
+  if (main) main.classList.add('oculto');
+  if (nav) nav.classList.add('oculto');
+  if (panelSesion) panelSesion.classList.add('oculto');
+
+  if (errorBox) {
+    if (mensajeError) {
+      errorBox.textContent = mensajeError;
+      errorBox.classList.remove('oculto');
+    } else {
+      errorBox.classList.add('oculto');
+    }
+  }
+}
+
+function mostrarAplicacion() {
+  const pantallaLogin = $('#pantalla-login');
+  const main = $('main');
+  const nav = $('header nav');
+  const panelSesion = $('#panel-sesion');
+
+  if (pantallaLogin) pantallaLogin.classList.add('oculto');
+  if (main) main.classList.remove('oculto');
+  if (nav) nav.classList.remove('oculto');
+  if (panelSesion) panelSesion.classList.remove('oculto');
 }
 
 async function iniciarSesion(username, password) {
@@ -37,16 +77,32 @@ async function iniciarSesion(username, password) {
     token: data.token,
     usuario: data.usuario
   };
+  sessionStorage.setItem(CLAVE_STORAGE, data.token);
+  mostrarAplicacion();
   actualizarUIUsuario();
   return sesionActual;
 }
 
+function cerrarSesion() {
+  sesionActual = { token: null, usuario: null };
+  sessionStorage.removeItem(CLAVE_STORAGE);
+  mostrarLogin();
+}
+
 function actualizarUIUsuario() {
   const badge = $('#badge-sesion');
-  if (!badge || !sesionActual.usuario) return;
+  const nombreSpan = $('#nombre-usuario');
+  if (!sesionActual.usuario) return;
+
+  if (nombreSpan) {
+    nombreSpan.textContent = sesionActual.usuario.nombre || sesionActual.usuario.username;
+  }
+
   const esMayor = sesionActual.usuario.rol === 'supervisor_mayor';
-  badge.textContent = esMayor ? '👑 Mayor' : `🏢 Menor (${sesionActual.usuario.bodega?.nombre || 'Bodega ' + sesionActual.usuario.bodega_id})`;
-  badge.className = `badge-sesion ${esMayor ? 'mayor' : 'menor'}`;
+  if (badge) {
+    badge.textContent = esMayor ? '👑 Mayor' : `🏢 Menor (${sesionActual.usuario.bodega?.nombre || 'Bodega ' + sesionActual.usuario.bodega_id})`;
+    badge.className = `badge-sesion ${esMayor ? 'mayor' : 'menor'}`;
+  }
 
   // Ocultar creación de pedidos si es supervisor menor
   const formPedido = $('#form-pedido');
@@ -370,19 +426,61 @@ $('#form-bodega').addEventListener('submit', (evento) => {
 
 $$('nav button').forEach(b => b.addEventListener('click', () => activarPestana(b.dataset.pestana)));
 
-const selectUsuario = $('#select-usuario-activo');
-if (selectUsuario) {
-  selectUsuario.addEventListener('change', async (e) => {
-    const [username, password] = e.target.value.split(':');
-    await ejecutar(async () => {
-      await iniciarSesion(username, password);
-      avisar(`Sesión activa: ${sesionActual.usuario.nombre} (${sesionActual.usuario.rol})`, false);
-    });
+// Botón cerrar sesión
+const btnLogout = $('#btn-logout');
+if (btnLogout) {
+  btnLogout.addEventListener('click', () => {
+    cerrarSesion();
+    avisar('Sesión cerrada correctamente', false);
   });
-
-  // Autenticar inicialmente con el usuario seleccionado
-  const [uInicial, pInicial] = selectUsuario.value.split(':');
-  iniciarSesion(uInicial, pInicial).catch(() => {});
 }
 
-activarPestana('existencias');
+// Formulario de inicio de sesión
+const formLogin = $('#form-login');
+if (formLogin) {
+  formLogin.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btnSubmit = $('#btn-iniciar-sesion');
+    const username = $('#input-username').value.trim();
+    const password = $('#input-password').value;
+
+    if (!username || !password) {
+      mostrarLogin('Por favor ingrese usuario y contraseña');
+      return;
+    }
+
+    try {
+      if (btnSubmit) btnSubmit.disabled = true;
+      await iniciarSesion(username, password);
+      formLogin.reset();
+      activarPestana('existencias');
+      avisar(`Bienvenido, ${sesionActual.usuario.nombre}`, false);
+    } catch (err) {
+      mostrarLogin(err.message || 'Error al iniciar sesión');
+    } finally {
+      if (btnSubmit) btnSubmit.disabled = false;
+    }
+  });
+}
+
+// Verificación de sesión persistida al cargar
+async function verificarSesionInicial() {
+  const tokenGuardado = sessionStorage.getItem(CLAVE_STORAGE);
+  if (!tokenGuardado) {
+    mostrarLogin();
+    return;
+  }
+
+  try {
+    sesionActual.token = tokenGuardado;
+    const perfil = await api('/auth/perfil');
+    sesionActual.usuario = perfil.usuario;
+    mostrarAplicacion();
+    actualizarUIUsuario();
+    activarPestana('existencias');
+  } catch {
+    cerrarSesion();
+  }
+}
+
+verificarSesionInicial();

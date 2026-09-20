@@ -18,16 +18,45 @@
       <button data-pestana="catalogo">Catálogo</button>
     </nav>
     <div id="panel-sesion" class="panel-sesion">
-      <label for="select-usuario-activo">👤 Sesión activa:</label>
-      <select id="select-usuario-activo">
-        <option value="carlos.mayor:mayor123">Carlos Mayor (Supervisor Mayor)</option>
-        <option value="ana.norte:norte123">Ana Norte (Supervisor Menor - Bodega Norte)</option>
-        <option value="sergio.sur:sur123">Sergio Sur (Supervisor Menor - Bodega Sur)</option>
-        <option value="camilo.central:central123">Camilo Central (Supervisor Menor - Bodega Central)</option>
-      </select>
+      <span id="info-usuario" class="info-usuario">👤 <strong id="nombre-usuario">...</strong></span>
       <span id="badge-sesion" class="badge-sesion mayor">Mayor</span>
+      <button id="btn-logout" class="btn-logout" type="button" title="Cerrar sesión">Cerrar sesión</button>
     </div>
   </header>
+
+  <!-- Pantalla de Login (visible si no hay sesión activa) -->
+  <div id="pantalla-login" class="pantalla-login oculto">
+    <div class="tarjeta-login">
+      <div class="login-cabecera">
+        <h2>StockFlow</h2>
+        <p>Sistema de gestión de inventario multibodega</p>
+      </div>
+
+      <form id="form-login" class="form-login">
+        <div id="error-login" class="aviso-error oculto"></div>
+
+        <label for="input-username">Usuario
+          <input type="text" id="input-username" name="username" placeholder="ej. carlos.mayor" required autocomplete="username">
+        </label>
+
+        <label for="input-password">Contraseña
+          <input type="password" id="input-password" name="password" placeholder="••••••••" required autocomplete="current-password">
+        </label>
+
+        <button type="submit" class="btn-login" id="btn-iniciar-sesion">Iniciar sesión</button>
+      </form>
+
+      <details class="credenciales-demo">
+        <summary>ℹ️ Credenciales de demostración</summary>
+        <div class="lista-credenciales">
+          <p><strong>Supervisor Mayor:</strong> <code>carlos.mayor</code> / <code>mayor123</code> (Acceso global)</p>
+          <p><strong>Supervisor Menor Norte:</strong> <code>ana.norte</code> / <code>norte123</code></p>
+          <p><strong>Supervisor Menor Sur:</strong> <code>sergio.sur</code> / <code>sur123</code></p>
+          <p><strong>Supervisor Menor Central:</strong> <code>camilo.central</code> / <code>central123</code></p>
+        </div>
+      </details>
+    </div>
+  </div>
 
   <div id="aviso" class="aviso oculto"></div>
 

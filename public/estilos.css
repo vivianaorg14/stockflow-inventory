@@ -31,15 +31,36 @@ button.peligro { background: #fff; color: var(--alerta-texto); border-color: var
 @media (max-width: 800px) { .dos-columnas { grid-template-columns: 1fr; } }
 
 /* Panel de sesión y roles */
-.panel-sesion { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 13px; background: rgba(255,255,255,0.15); padding: 4px 10px; border-radius: 6px; }
-.panel-sesion select { background: #fff; font-size: 13px; padding: 3px 6px; }
+.panel-sesion { margin-left: auto; display: flex; align-items: center; gap: 10px; font-size: 13px; background: rgba(255,255,255,0.15); padding: 4px 12px; border-radius: 6px; }
+.info-usuario { display: flex; align-items: center; gap: 4px; color: #fff; }
 .badge-sesion { display: inline-block; padding: 2px 8px; border-radius: 12px; font-weight: bold; font-size: 11px; text-transform: uppercase; }
 .badge-sesion.mayor { background: #ffd700; color: #553c00; }
 .badge-sesion.menor { background: #90cdf4; color: #1a365d; }
+.btn-logout { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: #fff; padding: 4px 9px; font-size: 12px; border-radius: 4px; cursor: pointer; transition: background 0.15s ease; }
+.btn-logout:hover { background: rgba(255,255,255,0.35); color: #fff; }
 
 /* Caja de balanceo sugerido */
 .caja-balanceo { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 12px; margin-top: 10px; font-size: 13px; }
 .caja-balanceo h4 { margin: 0 0 6px 0; color: #166534; font-size: 14px; }
 .caja-balanceo ul { margin: 4px 0 8px 18px; padding: 0; }
 .caja-balanceo .advertencia { color: #b45309; font-weight: 600; margin: 4px 0; }
+
+/* Pantalla de login */
+.pantalla-login { min-height: 85vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.tarjeta-login { background: #fff; border: 1px solid var(--borde); border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); padding: 32px 28px; width: 100%; max-width: 420px; }
+.login-cabecera { text-align: center; margin-bottom: 22px; }
+.login-cabecera h2 { margin: 0 0 6px; font-size: 24px; color: var(--primario); }
+.login-cabecera p { margin: 0; color: #64748b; font-size: 14px; }
+.form-login { display: flex; flex-direction: column; gap: 14px; }
+.form-login label { display: flex; flex-direction: column; font-size: 13px; font-weight: 600; gap: 5px; color: #334155; }
+.form-login input { width: 100%; padding: 9px 11px; font-size: 14px; border: 1px solid var(--borde); border-radius: 5px; }
+.form-login input:focus { outline: 2px solid var(--primario); border-color: transparent; }
+.btn-login { width: 100%; padding: 10px; font-size: 15px; font-weight: bold; background: var(--primario); color: #fff; border: none; border-radius: 5px; cursor: pointer; margin-top: 4px; }
+.btn-login:hover { filter: brightness(1.1); }
+.aviso-error { background: var(--alerta); color: var(--alerta-texto); border: 1px solid #f5b5b5; padding: 9px 12px; border-radius: 4px; font-size: 13px; text-align: center; }
+.credenciales-demo { margin-top: 24px; font-size: 12px; border-top: 1px solid #e2e8f0; padding-top: 14px; color: #475569; }
+.credenciales-demo summary { cursor: pointer; font-weight: 600; color: var(--primario); margin-bottom: 8px; }
+.lista-credenciales { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 5px; padding: 10px 12px; }
+.lista-credenciales p { margin: 4px 0; }
+.lista-credenciales code { background: #e2e8f0; padding: 1px 4px; border-radius: 3px; font-family: monospace; }
 
