@@ -24,3 +24,19 @@ test('producto inexistente responde 404 al obtener o descontinuar', async () => 
   assert.equal((await request(app).get('/api/productos/9999')).status, 404);
   assert.equal((await request(app).patch('/api/productos/9999/descontinuar')).status, 404);
 });
+
+test('crear producto con inicializar_existencias crea filas en existencias por bodega', async () => {
+  const token = tokenMenorSetup();
+  await request(app).post('/api/bodegas').send({ nombre: 'Bodega Test', ubicacion: 'Test' });
+  const res = await request(app)
+    .post('/api/productos')
+    .set('Authorization', `Bearer ${token}`)
+    .send({ sku: 'INI-001', nombre: 'Inicializado', inicializar_existencias: true });
+  assert.equal(res.status, 201);
+  const existencias = await request(app).get('/api/inventario/existencias');
+  const creadas = existencias.body.filter(e => e.sku === 'INI-001');
+  assert.ok(creadas.length >= 1, 'Debe haber filas en existencias para el nuevo producto');
+  assert.equal(creadas[0].cantidad_actual, 0);
+  assert.equal(creadas[0].minimo, 0);
+});
+

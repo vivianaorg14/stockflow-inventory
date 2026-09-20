@@ -1,7 +1,7 @@
 // src/controllers/productosController.js
 // Traduce HTTP ↔ modelo Producto. Sin try/catch: capturar() reenvía al manejador de errores.
 
-const { Producto } = require('../models');
+const { Producto, Bodega, ExistenciaPorBodega } = require('../models');
 const { capturar } = require('./http');
 const { ErrorDeNegocio, NoEncontrado } = require('../servicios/errores');
 
@@ -45,6 +45,17 @@ const crear = capturar(async (req, res) => {
   }
 
   const producto = await Producto.create({ sku, nombre, descripcion, estado });
+
+  if (req.body.inicializar_existencias) {
+    const bodegas = await Bodega.findAll();
+    for (const b of bodegas) {
+      await ExistenciaPorBodega.findOrCreate({
+        where: { producto_id: producto.id, bodega_id: b.id },
+        defaults: { cantidad_actual: 0, minimo: 0 }
+      });
+    }
+  }
+
   res.status(201).json(producto);
 });
 

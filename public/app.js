@@ -77,15 +77,17 @@ async function iniciarSesion(username, password) {
     token: data.token,
     usuario: data.usuario
   };
-  sessionStorage.setItem(CLAVE_STORAGE, data.token);
+  localStorage.setItem(CLAVE_STORAGE, data.token);
   mostrarAplicacion();
   actualizarUIUsuario();
+  iniciarPolling();
   return sesionActual;
 }
 
 function cerrarSesion() {
+  detenerPolling();
   sesionActual = { token: null, usuario: null };
-  sessionStorage.removeItem(CLAVE_STORAGE);
+  localStorage.removeItem(CLAVE_STORAGE);
   mostrarLogin();
 }
 
@@ -235,10 +237,41 @@ function pestanaActiva() {
   return $('nav button.activa')?.dataset.pestana || 'existencias';
 }
 
-async function refrescarPestanaActiva() {
+async function refrescarPestanaActiva(opciones = {}) {
+  // Si es un refresco silencioso en segundo plano y el usuario está interactuando con un campo, no interrumpir
+  if (opciones.silencioso && document.activeElement && ['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+    return;
+  }
   await cargarCatalogo();
-  await renderizadores[pestanaActiva()]();
+  const fn = renderizadores[pestanaActiva()];
+  if (fn) await fn();
 }
+
+// ---------- sincronización en segundo plano (polling inteligente cada 5 segundos) ----------
+
+let temporizadorPolling = null;
+
+function iniciarPolling() {
+  detenerPolling();
+  temporizadorPolling = setInterval(async () => {
+    if (sesionActual.token && !document.hidden) {
+      await refrescarPestanaActiva({ silencioso: true }).catch(() => {});
+    }
+  }, 5000);
+}
+
+function detenerPolling() {
+  if (temporizadorPolling) {
+    clearInterval(temporizadorPolling);
+    temporizadorPolling = null;
+  }
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && sesionActual.token) {
+    refrescarPestanaActiva({ silencioso: true }).catch(() => {});
+  }
+});
 
 function activarPestana(nombre) {
   const esMayor = sesionActual.usuario && sesionActual.usuario.rol === 'supervisor_mayor';
@@ -713,7 +746,12 @@ $('#tabla-productos').addEventListener('click', (evento) => {
 
 $('#form-producto').addEventListener('submit', (evento) => {
   evento.preventDefault();
-  ejecutar(async () => { await api('/productos', { method: 'POST', body: datosDeFormulario(evento.target) }); evento.target.reset(); }, 'Producto creado');
+  ejecutar(async () => {
+    const datos = datosDeFormulario(evento.target);
+    datos.inicializar_existencias = true;
+    await api('/productos', { method: 'POST', body: datos });
+    evento.target.reset();
+  }, 'Producto creado');
 });
 
 // ---------- arranque ----------
@@ -760,7 +798,7 @@ if (formLogin) {
 
 // Verificación de sesión persistida al cargar
 async function verificarSesionInicial() {
-  const tokenGuardado = sessionStorage.getItem(CLAVE_STORAGE);
+  const tokenGuardado = localStorage.getItem(CLAVE_STORAGE);
   if (!tokenGuardado) {
     mostrarLogin();
     return;
@@ -769,9 +807,10 @@ async function verificarSesionInicial() {
   try {
     sesionActual.token = tokenGuardado;
     const perfil = await api('/auth/perfil');
-    sesionActual.usuario = perfil.usuario;
+    sesionActual.usuario = perfil.usuario || perfil;
     mostrarAplicacion();
     actualizarUIUsuario();
+    iniciarPolling();
     const tabInicial = sesionActual.usuario.rol === 'supervisor_mayor' ? 'dashboard' : 'existencias';
     activarPestana(tabInicial);
   } catch {

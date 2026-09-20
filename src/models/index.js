@@ -46,7 +46,20 @@ Usuario.belongsTo(Bodega, { foreignKey: 'bodega_id', as: 'bodega' });
 // Función para sincronizar todos los modelos con la base de datos
 // force: false → no borra tablas existentes (para producción)
 // force: true  → borra y recrea (solo para desarrollo/seeds)
-const sincronizar = (force = false) => sequelize.sync({ force });
+const sincronizar = async (force = false) => {
+  await sequelize.sync({ force });
+  if (!force) {
+    try {
+      const [columnas] = await sequelize.query("PRAGMA table_info('items_pedido')");
+      const tieneBodega = columnas.some(c => c.name === 'bodega_id');
+      if (!tieneBodega && columnas.length > 0) {
+        await sequelize.query('ALTER TABLE items_pedido ADD COLUMN bodega_id INTEGER REFERENCES bodegas(id)');
+      }
+    } catch {
+      // Si la tabla no existe o ya está migrada
+    }
+  }
+};
 
 module.exports = {
   sequelize,
