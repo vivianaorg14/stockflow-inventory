@@ -35,6 +35,10 @@ ItemPedido.belongsTo(Pedido, { foreignKey: 'pedido_id', as: 'pedido' });
 // Un ítem de pedido referencia un producto
 ItemPedido.belongsTo(Producto, { foreignKey: 'producto_id', as: 'producto' });
 
+// Un ítem de pedido puede estar asignado a una bodega específica
+ItemPedido.belongsTo(Bodega, { foreignKey: 'bodega_id', as: 'bodega' });
+Bodega.hasMany(ItemPedido, { foreignKey: 'bodega_id', as: 'itemsPedido' });
+
 // Un supervisor menor pertenece a una bodega; una bodega tiene su supervisor menor
 Bodega.hasOne(Usuario, { foreignKey: 'bodega_id', as: 'supervisor' });
 Usuario.belongsTo(Bodega, { foreignKey: 'bodega_id', as: 'bodega' });

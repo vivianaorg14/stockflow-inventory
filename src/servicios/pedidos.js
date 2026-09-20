@@ -8,7 +8,10 @@ const { ajustarExistencia, exigirBodega } = require('./inventario');
 
 const INCLUIR_ITEMS = [{
   model: ItemPedido, as: 'items',
-  include: [{ model: Producto, as: 'producto', attributes: ['sku', 'nombre'] }]
+  include: [
+    { model: Producto, as: 'producto', attributes: ['sku', 'nombre'] },
+    { model: Bodega, as: 'bodega', attributes: ['id', 'nombre'] }
+  ]
 }];
 
 const ESTADOS_ABIERTOS = ['PENDIENTE', 'PARCIALMENTE_DESPACHADO'];
@@ -37,8 +40,17 @@ async function validarItems(items, transaccion) {
     if (!item.producto_id) throw new ErrorDeNegocio('Cada ítem debe tener producto_id');
     const producto = await Producto.findByPk(item.producto_id, { transaction: transaccion });
     if (!producto) throw new NoEncontrado(`Producto ${item.producto_id} no encontrado`);
+
+    let bodega_id = null;
+    if (item.bodega_id) {
+      bodega_id = Number(item.bodega_id);
+      const bodegaExiste = await Bodega.findByPk(bodega_id, { transaction: transaccion });
+      if (!bodegaExiste) throw new NoEncontrado(`Bodega ${bodega_id} no encontrada`);
+    }
+
     validados.push({
       producto_id: producto.id,
+      bodega_id,
       cantidad_solicitada: validarCantidad(item.cantidad_solicitada, 'cantidad_solicitada'),
       cantidad_despachada: 0
     });

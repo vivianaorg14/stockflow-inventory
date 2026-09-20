@@ -47,6 +47,11 @@ const ItemPedido = sequelize.define('ItemPedido', {
     allowNull: false,
     references: { model: 'productos', key: 'id' }
   },
+  bodega_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: { model: 'bodegas', key: 'id' }
+  },
   cantidad_solicitada: {
     type: DataTypes.INTEGER,
     allowNull: false,

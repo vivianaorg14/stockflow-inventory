@@ -504,6 +504,7 @@ $('#form-pedido').addEventListener('submit', (evento) => {
   evento.preventDefault();
   const items = $$('#items-pedido .fila-despacho').map(fila => ({
     producto_id: Number(fila.querySelector('.item-producto').value),
+    bodega_id: Number(fila.querySelector('.item-bodega-origen')?.value) || undefined,
     cantidad_solicitada: Number(fila.querySelector('.item-cantidad').value)
   }));
   const descripcion = evento.target.descripcion.value || undefined;
@@ -519,22 +520,54 @@ function htmlItemPedido(pedido, item) {
   const pendiente = item.cantidad_solicitada - item.cantidad_despachada;
   const abierto = pedido.estado === 'PENDIENTE' || pedido.estado === 'PARCIALMENTE_DESPACHADO';
   const esMayor = sesionActual.usuario && sesionActual.usuario.rol === 'supervisor_mayor';
-  const bodegasOpciones = (sesionActual.usuario && sesionActual.usuario.rol === 'supervisor_menor')
-    ? catalogo.bodegas.filter(b => Number(b.id) === Number(sesionActual.usuario.bodega_id))
-    : catalogo.bodegas;
+  const miBodegaId = sesionActual.usuario?.bodega_id;
 
-  // Punto 3: el botón "+ bodega" solo es visible para supervisor_mayor
+  const bodegaAsignada = item.bodega;
+  const bodegaAsignadaId = item.bodega_id || bodegaAsignada?.id;
+  const etiquetaBodega = bodegaAsignada
+    ? `<span class="badge-bodega-item" style="background:#e0f2fe;color:#0369a1;padding:2px 7px;border-radius:4px;font-size:12px;font-weight:600;margin-left:6px;">📍 ${escapar(bodegaAsignada.nombre)}</span>`
+    : '';
+
+  // ¿Puede despachar este ítem el usuario autenticado?
+  // - Mayor: puede despachar cualquier ítem desde cualquier bodega
+  // - Menor: solo puede despachar si el ítem está asignado a su propia bodega (o sin bodega asignada fija)
+  const puedeDespachar = esMayor || (!bodegaAsignadaId || Number(bodegaAsignadaId) === Number(miBodegaId));
+
+  let opcionesHtml = '';
+  if (esMayor) {
+    opcionesHtml = catalogo.bodegas.map(b => `
+      <option value="${b.id}" ${Number(b.id) === Number(bodegaAsignadaId) ? 'selected' : ''}>${escapar(b.nombre)}</option>
+    `).join('');
+  } else {
+    const miBodegaObj = catalogo.bodegas.find(b => Number(b.id) === Number(miBodegaId));
+    opcionesHtml = miBodegaObj ? `<option value="${miBodegaObj.id}" selected>${escapar(miBodegaObj.nombre)}</option>` : '';
+  }
+
+  // El botón "+ bodega" solo es visible para supervisor_mayor (reparto multibodega)
   const botonAgregarBodega = esMayor
     ? '<button type="button" class="secundario agregar-despacho">+ bodega</button>'
     : '';
 
-  const formulario = abierto && pendiente > 0 ? `
-    <div class="fila-despacho" data-item="${item.id}">
-      <select class="despacho-bodega">${opciones(bodegasOpciones, b => b.nombre)}</select>
-      <input type="number" class="despacho-cantidad" min="1" max="${pendiente}" step="1" placeholder="cantidad">
-      ${botonAgregarBodega}
-    </div>` : '';
-  return `<li>${escapar(item.producto?.sku)} — ${escapar(item.producto?.nombre)}: solicitado ${item.cantidad_solicitada}, despachado ${item.cantidad_despachada}, pendiente ${pendiente}${formulario}<div class="despachos-pendientes" data-item="${item.id}"></div></li>`;
+  let formulario = '';
+  if (abierto && pendiente > 0) {
+    if (puedeDespachar) {
+      formulario = `
+        <div class="fila-despacho" data-item="${item.id}">
+          <select class="despacho-bodega">${opcionesHtml}</select>
+          <input type="number" class="despacho-cantidad" min="1" max="${pendiente}" step="1" placeholder="cantidad">
+          ${botonAgregarBodega}
+        </div>`;
+    } else {
+      formulario = `<span class="info-asignacion" style="color:#64748b;font-size:12px;margin-left:8px;font-style:italic;">(Asignado para despacho en ${escapar(bodegaAsignada?.nombre || 'otra bodega')})</span>`;
+    }
+  }
+
+  return `<li>
+    ${escapar(item.producto?.sku)} — ${escapar(item.producto?.nombre)}: solicitado ${item.cantidad_solicitada}, despachado ${item.cantidad_despachada}, pendiente ${pendiente}
+    ${etiquetaBodega}
+    ${formulario}
+    <div class="despachos-pendientes" data-item="${item.id}"></div>
+  </li>`;
 }
 
 async function renderizarPedidos() {
@@ -578,23 +611,27 @@ $('#lista-pedidos').addEventListener('click', (evento) => {
   }
 
   if (evento.target.classList.contains('sugerir-balanceo')) {
-    ejecutar(async () => {
-      const sugerencia = await api(`/pedidos/${pedidoId}/sugerir-reparto`, { method: 'POST' });
-      const contenedor = tarjeta.querySelector('.contenedor-balanceo');
-      let html = `<div class="caja-balanceo">
-        <h4>💡 Propuesta de balanceo de inventario (solo lectura):</h4>
-        <p><em>${escapar(sugerencia.criterio)}</em></p>
-        <ul>
-          ${sugerencia.propuesta_despacho.map(p => `
-            <li><strong>${escapar(p.bodega)}</strong>: despachar <strong>${p.cantidad}</strong> unidades de ${escapar(p.producto || 'ítem #' + p.item_pedido_id)} (stock resultante: ${p.stock_resultante}, mín: ${p.minimo}) ${p.queda_bajo_minimo ? '⚠️' : '✅'}</li>
-          `).join('')}
-        </ul>`;
-      if (sugerencia.advertencias && sugerencia.advertencias.length > 0) {
-        html += `<div class="advertencia">⚠️ Advertencias:</div><ul>${sugerencia.advertencias.map(a => `<li>${escapar(a)}</li>`).join('')}</ul>`;
+    (async () => {
+      try {
+        const sugerencia = await api(`/pedidos/${pedidoId}/sugerir-reparto`, { method: 'POST' });
+        const contenedor = tarjeta.querySelector('.contenedor-balanceo');
+        let html = `<div class="caja-balanceo">
+          <h4>💡 Propuesta de balanceo de inventario (solo lectura):</h4>
+          <p><em>${escapar(sugerencia.criterio)}</em></p>
+          <ul>
+            ${sugerencia.propuesta_despacho.map(p => `
+              <li><strong>${escapar(p.bodega)}</strong>: despachar <strong>${p.cantidad}</strong> unidades de ${escapar(p.producto || 'ítem #' + p.item_pedido_id)} (stock resultante: ${p.stock_resultante}, mín: ${p.minimo}) ${p.queda_bajo_minimo ? '⚠️' : '✅'}</li>
+            `).join('')}
+          </ul>`;
+        if (sugerencia.advertencias && sugerencia.advertencias.length > 0) {
+          html += `<div class="advertencia">⚠️ Advertencias:</div><ul>${sugerencia.advertencias.map(a => `<li>${escapar(a)}</li>`).join('')}</ul>`;
+        }
+        html += `</div>`;
+        contenedor.innerHTML = html;
+      } catch (error) {
+        avisar(error.message);
       }
-      html += `</div>`;
-      contenedor.innerHTML = html;
-    });
+    })();
     return;
   }
 

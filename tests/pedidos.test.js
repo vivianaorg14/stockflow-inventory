@@ -106,3 +106,15 @@ test('un id de pedido no numérico responde 400, no 500', async () => {
   assert.equal((await request(app).post('/api/pedidos/abc/cancelar')).status, 400);
   assert.equal((await request(app).post('/api/pedidos/abc/despachar').send({ despachos: [] })).status, 400);
 });
+
+test('crear pedido con bodega_id en ítem guarda la asociación y la incluye al listar', async () => {
+  const { resma } = cat.productos;
+  const { sur } = cat.bodegas;
+  const res = await request(app).post('/api/pedidos').send({
+    descripcion: 'Pedido con bodega específica',
+    items: [{ producto_id: resma.id, bodega_id: sur.id, cantidad_solicitada: 15 }]
+  });
+  assert.equal(res.status, 201);
+  assert.equal(res.body.items[0].bodega_id, sur.id);
+  assert.equal(res.body.items[0].bodega?.nombre, 'Sur');
+});
