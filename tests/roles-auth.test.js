@@ -323,3 +323,38 @@ test('Balanceo sugerido: POST /api/pedidos/:id/sugerir-reparto propone distribuc
   const pedBD = await PedModel.findByPk(pedido.id);
   assert.equal(pedBD.estado, 'PENDIENTE'); // Sigue en PENDIENTE intacto
 });
+
+test('Restricciones supervisor_mayor: no puede registrar movimientos (HTTP 403)', async () => {
+  await prepararBase();
+  const { bodegas, productos } = await crearCatalogoBase();
+  const tokenMayor = tokenSupervisorMayor();
+
+  const res = await request(app)
+    .post('/api/movimientos')
+    .set('Authorization', `Bearer ${tokenMayor}`)
+    .send({
+      tipo: 'ENTRADA',
+      producto_id: productos.resma.id,
+      bodega_destino_id: bodegas.norte.id,
+      cantidad: 10
+    });
+
+  assert.equal(res.status, 403);
+  assert.match(res.body.error, /supervisor_mayor solo puede consultar/i);
+});
+
+test('Restricciones supervisor_mayor: no puede crear productos (HTTP 403)', async () => {
+  await prepararBase();
+  const tokenMayor = tokenSupervisorMayor();
+
+  const res = await request(app)
+    .post('/api/productos')
+    .set('Authorization', `Bearer ${tokenMayor}`)
+    .send({
+      sku: 'MAY-001',
+      nombre: 'Producto no permitido'
+    });
+
+  assert.equal(res.status, 403);
+  assert.match(res.body.error, /supervisor_mayor no puede crear productos/i);
+});

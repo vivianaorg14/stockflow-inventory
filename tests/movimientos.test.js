@@ -1,12 +1,17 @@
 const { test, before, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
-const { app, request, prepararBase, crearCatalogoBase, entrada, existencia } = require('./apoyo');
+const { app, request, prepararBase, crearCatalogoBase, entrada, existencia, tokenSupervisorMenor } = require('./apoyo');
 
 let cat;
 before(prepararBase);
 beforeEach(async () => { await prepararBase(); cat = await crearCatalogoBase(); });
 
-const mover = (cuerpo) => request(app).post('/api/movimientos').send(cuerpo);
+const mover = (cuerpo, bodegaId = null) => {
+  const bId = bodegaId || cuerpo.bodega_destino_id || cuerpo.bodega_origen_id || (cat?.bodegas?.norte?.id ?? 1);
+  return request(app).post('/api/movimientos')
+    .set('Authorization', `Bearer ${tokenSupervisorMenor(bId)}`)
+    .send(cuerpo);
+};
 
 test('D-05: existencia insuficiente responde 400, no 500', async () => {
   const { resma } = cat.productos; const { norte } = cat.bodegas;

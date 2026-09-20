@@ -104,6 +104,12 @@ function actualizarUIUsuario() {
     badge.className = `badge-sesion ${esMayor ? 'mayor' : 'menor'}`;
   }
 
+  // Dashboard analítico: exclusivo para supervisor_mayor
+  const btnDashboard = $('#btn-pestana-dashboard');
+  if (btnDashboard) {
+    btnDashboard.style.display = esMayor ? '' : 'none';
+  }
+
   // Ocultar creación de pedidos si es supervisor menor
   const formPedido = $('#form-pedido');
   if (formPedido) {
@@ -112,18 +118,29 @@ function actualizarUIUsuario() {
     if (tituloNuevo && tituloNuevo.tagName === 'H2') tituloNuevo.style.display = esMayor ? 'block' : 'none';
   }
 
-  // Punto 4: ocultar pestaña Auditoría para supervisor_menor
+  // Ocultar pestaña Auditoría para supervisor_menor (exclusivo mayor)
   const btnAuditoria = $('nav button[data-pestana="auditoria"]');
   if (btnAuditoria) {
     btnAuditoria.style.display = esMayor ? '' : 'none';
   }
 
-  // Punto 1: ocultar selector de bodega en existencias para supervisor_menor
-  // (el backend ya filtra por bodega asignada; el selector no tiene sentido)
+  // Ocultar selector de bodega en existencias para supervisor_menor
   const contenedorFiltro = $('#filtro-bodega');
   if (contenedorFiltro) {
     const labelFiltro = contenedorFiltro.closest('label');
     if (labelFiltro) labelFiltro.style.display = esMayor ? '' : 'none';
+  }
+
+  // Movimientos: supervisor_mayor NO puede registrar movimientos (solo menor)
+  const bloqueMovimiento = $('#bloque-crear-movimiento');
+  if (bloqueMovimiento) {
+    bloqueMovimiento.style.display = esMayor ? 'none' : 'block';
+  }
+
+  // Catálogo: supervisor_mayor NO puede crear productos (solo menor)
+  const bloqueProducto = $('#bloque-crear-producto');
+  if (bloqueProducto) {
+    bloqueProducto.style.display = esMayor ? 'none' : 'block';
   }
 }
 
@@ -167,11 +184,28 @@ function escapar(texto) {
   return String(texto ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+let existenciasCache = [];
+let graficosInstancias = {};
+
+function destruirGraficos() {
+  for (const key of Object.keys(graficosInstancias)) {
+    if (graficosInstancias[key]) {
+      graficosInstancias[key].destroy();
+      delete graficosInstancias[key];
+    }
+  }
+}
+
 // ---------- catálogo compartido ----------
 
 async function cargarCatalogo() {
-  const [productos, bodegas] = await Promise.all([api('/productos'), api('/bodegas')]);
+  const [productos, bodegas, existencias] = await Promise.all([
+    api('/productos'),
+    api('/bodegas'),
+    api('/inventario/existencias').catch(() => [])
+  ]);
   catalogo = { productos, bodegas };
+  existenciasCache = existencias;
   const htmlProductos = opciones(productos, p => `${p.sku} — ${p.nombre}${p.estado === 'DESCONTINUADO' ? ' (descontinuado)' : ''}`);
   const htmlBodegas = opciones(bodegas, b => b.nombre);
   $$('.select-producto').forEach(s => { s.innerHTML = htmlProductos; });
@@ -182,6 +216,7 @@ async function cargarCatalogo() {
 // ---------- pestañas ----------
 
 const renderizadores = {
+  dashboard: renderizarDashboard,
   existencias: renderizarExistencias,
   movimientos: renderizarMovimientos,
   pedidos: renderizarPedidos,
@@ -190,7 +225,7 @@ const renderizadores = {
 };
 
 function pestanaActiva() {
-  return $('nav button.activa').dataset.pestana;
+  return $('nav button.activa')?.dataset.pestana || 'existencias';
 }
 
 async function refrescarPestanaActiva() {
@@ -199,14 +234,140 @@ async function refrescarPestanaActiva() {
 }
 
 function activarPestana(nombre) {
-  // Punto 4: bloquear acceso directo a auditoría para supervisor_menor
-  if (nombre === 'auditoria' && sesionActual.usuario && sesionActual.usuario.rol === 'supervisor_menor') {
+  const esMayor = sesionActual.usuario && sesionActual.usuario.rol === 'supervisor_mayor';
+  if (nombre === 'dashboard' && !esMayor) {
+    avisar('Acceso denegado: el Dashboard es exclusivo del Supervisor Mayor');
+    nombre = 'existencias';
+  }
+  if (nombre === 'auditoria' && !esMayor) {
     avisar('Acceso denegado: la auditoría es exclusiva del Supervisor Mayor');
     nombre = 'existencias';
   }
   $$('nav button').forEach(b => b.classList.toggle('activa', b.dataset.pestana === nombre));
   $$('.pestana').forEach(s => s.classList.toggle('oculto', s.id !== nombre));
   refrescarPestanaActiva().catch(e => avisar(e.message));
+}
+
+// ---------- dashboard analítico (exclusivo supervisor_mayor) ----------
+
+async function renderizarDashboard() {
+  const esMayor = sesionActual.usuario && sesionActual.usuario.rol === 'supervisor_mayor';
+  if (!esMayor) {
+    avisar('Acceso denegado: El dashboard es exclusivo del Supervisor Mayor');
+    activarPestana('existencias');
+    return;
+  }
+
+  const [existencias, movimientos] = await Promise.all([
+    api('/inventario/existencias'),
+    api('/movimientos')
+  ]);
+
+  destruirGraficos();
+
+  const bodegas = catalogo.bodegas;
+  const nombresBodegas = bodegas.map(b => b.nombre);
+  const idsBodegas = bodegas.map(b => b.id);
+
+  // 1. Existencias actuales por bodega
+  const stockPorBodega = idsBodegas.map(id => {
+    return existencias
+      .filter(e => Number(e.bodega_id) === Number(id))
+      .reduce((sum, e) => sum + Number(e.cantidad_actual), 0);
+  });
+
+  const ctxStock = $('#grafico-existencias');
+  if (ctxStock && window.Chart) {
+    graficosInstancias['stock'] = new window.Chart(ctxStock, {
+      type: 'bar',
+      data: {
+        labels: nombresBodegas,
+        datasets: [{
+          label: 'Unidades en stock',
+          data: stockPorBodega,
+          backgroundColor: ['#1f4e79', '#2563eb', '#38bdf8'],
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+  }
+
+  // 2. Productos bajo mínimo por bodega
+  const bajoMinPorBodega = idsBodegas.map(id => {
+    return existencias.filter(e => Number(e.bodega_id) === Number(id) && e.bajo_minimo).length;
+  });
+
+  const ctxBajoMin = $('#grafico-bajo-minimo');
+  if (ctxBajoMin && window.Chart) {
+    graficosInstancias['bajoMin'] = new window.Chart(ctxBajoMin, {
+      type: 'bar',
+      data: {
+        labels: nombresBodegas,
+        datasets: [{
+          label: 'Productos bajo mínimo',
+          data: bajoMinPorBodega,
+          backgroundColor: ['#dc2626', '#ea580c', '#f59e0b'],
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+      }
+    });
+  }
+
+  // 3. Movimientos recientes por bodega (Entradas vs Salidas)
+  const entradasPorBodega = idsBodegas.map(id => {
+    return movimientos
+      .filter(m => (m.tipo === 'ENTRADA' && Number(m.bodega_destino_id) === Number(id)) ||
+                   (m.tipo === 'AJUSTE' && m.sentido === 'ENTRADA' && Number(m.bodega_destino_id) === Number(id)))
+      .reduce((sum, m) => sum + Number(m.cantidad), 0);
+  });
+
+  const salidasPorBodega = idsBodegas.map(id => {
+    return movimientos
+      .filter(m => (m.tipo === 'SALIDA' && Number(m.bodega_origen_id) === Number(id)) ||
+                   (m.tipo === 'AJUSTE' && m.sentido === 'SALIDA' && Number(m.bodega_origen_id) === Number(id)))
+      .reduce((sum, m) => sum + Number(m.cantidad), 0);
+  });
+
+  const ctxMovs = $('#grafico-movimientos');
+  if (ctxMovs && window.Chart) {
+    graficosInstancias['movs'] = new window.Chart(ctxMovs, {
+      type: 'bar',
+      data: {
+        labels: nombresBodegas,
+        datasets: [
+          {
+            label: 'Entradas acumuladas',
+            data: entradasPorBodega,
+            backgroundColor: '#10b981',
+            borderRadius: 4
+          },
+          {
+            label: 'Salidas acumuladas',
+            data: salidasPorBodega,
+            backgroundColor: '#ef4444',
+            borderRadius: 4
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+  }
 }
 
 // ---------- existencias ----------
@@ -300,10 +461,33 @@ async function renderizarMovimientos() {
 function agregarFilaItem() {
   const fila = document.createElement('div');
   fila.className = 'fila-despacho';
-  fila.innerHTML = `<select class="select-producto item-producto">${opciones(catalogo.productos, p => `${p.sku} — ${p.nombre}`)}</select>
+  fila.innerHTML = `
+    <select class="select-producto item-producto" required>${opciones(catalogo.productos, p => `${p.sku} — ${p.nombre}`)}</select>
+    <select class="select-bodega item-bodega-origen" title="Bodega origen para despacho">${opciones(catalogo.bodegas, b => b.nombre)}</select>
+    <span class="stock-disp-tag" title="Stock actual disponible en la bodega seleccionada (solo lectura)">Disp: <strong class="valor-disp">—</strong></span>
     <input type="number" class="item-cantidad" min="1" step="1" placeholder="cantidad" required>
-    <button type="button" class="secundario quitar-item">quitar</button>`;
+    <button type="button" class="secundario quitar-item">quitar</button>
+  `;
   fila.querySelector('.quitar-item').addEventListener('click', () => fila.remove());
+
+  const selProducto = fila.querySelector('.item-producto');
+  const selBodega = fila.querySelector('.item-bodega-origen');
+  const valorDisp = fila.querySelector('.valor-disp');
+  const tagDisp = fila.querySelector('.stock-disp-tag');
+
+  const actualizarStockVisual = () => {
+    const prodId = Number(selProducto.value);
+    const bodId = Number(selBodega.value);
+    const ex = existenciasCache.find(e => Number(e.producto_id) === prodId && Number(e.bodega_id) === bodId);
+    const actual = ex ? ex.cantidad_actual : 0;
+    valorDisp.textContent = `${actual} unid.`;
+    tagDisp.classList.toggle('agotado', actual <= 0);
+  };
+
+  selProducto.addEventListener('change', actualizarStockVisual);
+  selBodega.addEventListener('change', actualizarStockVisual);
+  actualizarStockVisual();
+
   $('#items-pedido').appendChild(fila);
 }
 
@@ -494,7 +678,8 @@ if (formLogin) {
       if (btnSubmit) btnSubmit.disabled = true;
       await iniciarSesion(username, password);
       formLogin.reset();
-      activarPestana('existencias');
+      const tabInicial = sesionActual.usuario.rol === 'supervisor_mayor' ? 'dashboard' : 'existencias';
+      activarPestana(tabInicial);
       avisar(`Bienvenido, ${sesionActual.usuario.nombre}`, false);
     } catch (err) {
       mostrarLogin(err.message || 'Error al iniciar sesión');
@@ -518,7 +703,8 @@ async function verificarSesionInicial() {
     sesionActual.usuario = perfil.usuario;
     mostrarAplicacion();
     actualizarUIUsuario();
-    activarPestana('existencias');
+    const tabInicial = sesionActual.usuario.rol === 'supervisor_mayor' ? 'dashboard' : 'existencias';
+    activarPestana(tabInicial);
   } catch {
     cerrarSesion();
   }

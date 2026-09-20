@@ -20,8 +20,14 @@ const obtener = capturar(async (req, res) => {
   res.json(producto);
 });
 
-// POST /productos — crea un producto nuevo
+// POST /productos — crea un producto nuevo (solo supervisor_menor)
 const crear = capturar(async (req, res) => {
+  if (req.usuario && req.usuario.rol === 'supervisor_mayor') {
+    return res.status(403).json({
+      error: 'Acceso denegado: el supervisor_mayor no puede crear productos'
+    });
+  }
+
   const { sku, nombre, descripcion, estado } = req.body;
 
   // Validaciones básicas

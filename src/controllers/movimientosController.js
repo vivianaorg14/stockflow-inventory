@@ -16,6 +16,13 @@ const listar = capturar(async (req, res) => {
 });
 
 const registrar = capturar(async (req, res) => {
+  // Solo el supervisor_menor puede registrar movimientos
+  if (req.usuario && req.usuario.rol === 'supervisor_mayor') {
+    return res.status(403).json({
+      error: 'Acceso denegado: el supervisor_mayor solo puede consultar el historial de movimientos, no registrar nuevos'
+    });
+  }
+
   if (req.usuario && req.usuario.rol === 'supervisor_menor') {
     const miBodega = req.usuario.bodega_id;
     const { tipo, bodega_origen_id, bodega_destino_id, sentido } = req.body;
@@ -24,7 +31,7 @@ const registrar = capturar(async (req, res) => {
     if (tipo === 'ENTRADA') bodegaAfectada = bodega_destino_id;
     else if (tipo === 'SALIDA') bodegaAfectada = bodega_origen_id;
     else if (tipo === 'TRASLADO') bodegaAfectada = bodega_origen_id; // debe salir de su propia bodega
-    else if (tipo === 'AJUSTE') bodegaAfectada = sentido === 'ENTRADA' ? bodega_destino_id : bodega_origen_id;
+    else if (tipo === 'AJUSTE') bodegaAfectada = sentido === 'ENTRADA' ? bodega_destino_id : (bodega_origen_id || bodega_destino_id);
 
     if (Number(bodegaAfectada) !== Number(miBodega)) {
       return res.status(403).json({

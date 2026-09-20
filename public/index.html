@@ -6,11 +6,13 @@
   <title>StockFlow — Inventario multibodega</title>
   <link rel="stylesheet" href="estilos.css">
   <link rel="icon" href="data:,">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
   <header>
     <h1>StockFlow</h1>
     <nav>
+      <button data-pestana="dashboard" id="btn-pestana-dashboard">Dashboard</button>
       <button data-pestana="existencias" class="activa">Existencias</button>
       <button data-pestana="movimientos">Movimientos</button>
       <button data-pestana="pedidos">Pedidos</button>
@@ -61,6 +63,24 @@
   <div id="aviso" class="aviso oculto"></div>
 
   <main>
+    <section id="dashboard" class="pestana oculto">
+      <h2>Dashboard analítico multibodega</h2>
+      <div class="grid-graficos">
+        <div class="tarjeta-grafico">
+          <h3>Existencias actuales por bodega</h3>
+          <div class="canvas-wrapper"><canvas id="grafico-existencias"></canvas></div>
+        </div>
+        <div class="tarjeta-grafico">
+          <h3>Productos bajo mínimo por bodega</h3>
+          <div class="canvas-wrapper"><canvas id="grafico-bajo-minimo"></canvas></div>
+        </div>
+        <div class="tarjeta-grafico tarjeta-grafico-ancha">
+          <h3>Movimientos recientes por bodega (Entradas vs Salidas)</h3>
+          <div class="canvas-wrapper"><canvas id="grafico-movimientos"></canvas></div>
+        </div>
+      </div>
+    </section>
+
     <section id="existencias" class="pestana">
       <h2>Existencias por producto y bodega</h2>
       <label>Bodega: <select id="filtro-bodega"><option value="">Todas</option></select></label>
@@ -71,26 +91,28 @@
     </section>
 
     <section id="movimientos" class="pestana oculto">
-      <h2>Registrar movimiento</h2>
-      <form id="form-movimiento" class="formulario">
-        <label>Tipo
-          <select name="tipo" required>
-            <option value="ENTRADA">Entrada</option>
-            <option value="SALIDA">Salida</option>
-            <option value="TRASLADO">Traslado</option>
-            <option value="AJUSTE">Ajuste</option>
-          </select>
-        </label>
-        <label id="campo-sentido" class="oculto">Sentido
-          <select name="sentido"><option value="ENTRADA">Suma</option><option value="SALIDA">Resta</option></select>
-        </label>
-        <label>Producto <select name="producto_id" class="select-producto" required></select></label>
-        <label id="campo-origen">Bodega origen <select name="bodega_origen_id" class="select-bodega"></select></label>
-        <label id="campo-destino">Bodega destino <select name="bodega_destino_id" class="select-bodega"></select></label>
-        <label>Cantidad <input name="cantidad" type="number" min="1" step="1" required></label>
-        <label>Notas <input name="notas" type="text"></label>
-        <button type="submit">Registrar</button>
-      </form>
+      <div id="bloque-crear-movimiento">
+        <h2>Registrar movimiento</h2>
+        <form id="form-movimiento" class="formulario">
+          <label>Tipo
+            <select name="tipo" required>
+              <option value="ENTRADA">Entrada</option>
+              <option value="SALIDA">Salida</option>
+              <option value="TRASLADO">Traslado</option>
+              <option value="AJUSTE">Ajuste</option>
+            </select>
+          </label>
+          <label id="campo-sentido" class="oculto">Sentido
+            <select name="sentido"><option value="ENTRADA">Suma</option><option value="SALIDA">Resta</option></select>
+          </label>
+          <label>Producto <select name="producto_id" class="select-producto" required></select></label>
+          <label id="campo-origen">Bodega origen <select name="bodega_origen_id" class="select-bodega"></select></label>
+          <label id="campo-destino">Bodega destino <select name="bodega_destino_id" class="select-bodega"></select></label>
+          <label>Cantidad <input name="cantidad" type="number" min="1" step="1" required></label>
+          <label>Notas <input name="notas" type="text"></label>
+          <button type="submit">Registrar</button>
+        </form>
+      </div>
       <h2>Historial</h2>
       <table>
         <thead><tr><th>Fecha</th><th>Tipo</th><th>Producto</th><th>Origen</th><th>Destino</th><th>Cantidad</th><th>Notas</th></tr></thead>
@@ -123,12 +145,14 @@
       <div class="dos-columnas">
         <div>
           <h2>Productos</h2>
-          <form id="form-producto" class="formulario">
-            <label>SKU <input name="sku" required></label>
-            <label>Nombre <input name="nombre" required></label>
-            <label>Descripción <input name="descripcion"></label>
-            <button type="submit">Crear producto</button>
-          </form>
+          <div id="bloque-crear-producto">
+            <form id="form-producto" class="formulario">
+              <label>SKU <input name="sku" required></label>
+              <label>Nombre <input name="nombre" required></label>
+              <label>Descripción <input name="descripcion"></label>
+              <button type="submit">Crear producto</button>
+            </form>
+          </div>
           <table>
             <thead><tr><th>SKU</th><th>Nombre</th><th>Estado</th><th></th></tr></thead>
             <tbody id="tabla-productos"></tbody>

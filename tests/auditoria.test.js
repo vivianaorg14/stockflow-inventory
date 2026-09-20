@@ -2,7 +2,7 @@
 // R3: el saldo actual debe poder reconstruirse sumando la historia de movimientos (D-01).
 const { test, before, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
-const { app, request, prepararBase, crearCatalogoBase, entrada } = require('./apoyo');
+const { app, request, prepararBase, crearCatalogoBase, entrada, tokenSupervisorMenor } = require('./apoyo');
 const { sequelize } = require('../src/models');
 
 let cat;
@@ -12,9 +12,15 @@ beforeEach(async () => { await prepararBase(); cat = await crearCatalogoBase(); 
 test('tras entradas, traslados, salidas, ajustes y despachos todo cuadra', async () => {
   const { resma } = cat.productos; const { norte, sur } = cat.bodegas;
   await entrada(resma.id, norte.id, 100);
-  await request(app).post('/api/movimientos').send({ tipo: 'TRASLADO', producto_id: resma.id, bodega_origen_id: norte.id, bodega_destino_id: sur.id, cantidad: 40 });
-  await request(app).post('/api/movimientos').send({ tipo: 'SALIDA', producto_id: resma.id, bodega_origen_id: sur.id, cantidad: 10 });
-  await request(app).post('/api/movimientos').send({ tipo: 'AJUSTE', sentido: 'SALIDA', producto_id: resma.id, bodega_origen_id: norte.id, cantidad: 3, notas: 'merma' });
+  await request(app).post('/api/movimientos')
+    .set('Authorization', `Bearer ${tokenSupervisorMenor(norte.id)}`)
+    .send({ tipo: 'TRASLADO', producto_id: resma.id, bodega_origen_id: norte.id, bodega_destino_id: sur.id, cantidad: 40 });
+  await request(app).post('/api/movimientos')
+    .set('Authorization', `Bearer ${tokenSupervisorMenor(sur.id)}`)
+    .send({ tipo: 'SALIDA', producto_id: resma.id, bodega_origen_id: sur.id, cantidad: 10 });
+  await request(app).post('/api/movimientos')
+    .set('Authorization', `Bearer ${tokenSupervisorMenor(norte.id)}`)
+    .send({ tipo: 'AJUSTE', sentido: 'SALIDA', producto_id: resma.id, bodega_origen_id: norte.id, cantidad: 3, notas: 'merma' });
   const pedido = (await request(app).post('/api/pedidos').send({ items: [{ producto_id: resma.id, cantidad_solicitada: 20 }] })).body;
   await request(app).post(`/api/pedidos/${pedido.id}/despachar`).send({ despachos: [{ item_pedido_id: pedido.items[0].id, bodega_id: sur.id, cantidad: 20 }] });
 

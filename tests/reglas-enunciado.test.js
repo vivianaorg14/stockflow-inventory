@@ -1,7 +1,7 @@
 // Caracteriza R1, R2 y R4 del enunciado (docs/08-enunciado.md) tal como se cumplen hoy.
 const { test, before, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
-const { app, request, prepararBase, crearCatalogoBase, entrada, existencia } = require('./apoyo');
+const { app, request, prepararBase, crearCatalogoBase, entrada, existencia, tokenSupervisorMenor, tokenMenorSetup } = require('./apoyo');
 
 let cat;
 before(prepararBase);
@@ -11,9 +11,11 @@ test('R1: un traslado descuenta en origen y suma en destino', async () => {
   const { resma } = cat.productos; const { norte, sur } = cat.bodegas;
   await entrada(resma.id, norte.id, 100);
 
-  const res = await request(app).post('/api/movimientos').send({
-    tipo: 'TRASLADO', producto_id: resma.id, bodega_origen_id: norte.id, bodega_destino_id: sur.id, cantidad: 30
-  });
+  const res = await request(app).post('/api/movimientos')
+    .set('Authorization', `Bearer ${tokenSupervisorMenor(norte.id)}`)
+    .send({
+      tipo: 'TRASLADO', producto_id: resma.id, bodega_origen_id: norte.id, bodega_destino_id: sur.id, cantidad: 30
+    });
 
   assert.equal(res.status, 201);
   assert.equal(await existencia(resma.id, norte.id), 70);
@@ -25,9 +27,11 @@ test('R1: un traslado que dejaría negativo se rechaza sin tocar saldos ni histo
   await entrada(resma.id, norte.id, 5);
   const antes = (await request(app).get('/api/movimientos')).body.length;
 
-  const res = await request(app).post('/api/movimientos').send({
-    tipo: 'TRASLADO', producto_id: resma.id, bodega_origen_id: norte.id, bodega_destino_id: sur.id, cantidad: 99
-  });
+  const res = await request(app).post('/api/movimientos')
+    .set('Authorization', `Bearer ${tokenSupervisorMenor(norte.id)}`)
+    .send({
+      tipo: 'TRASLADO', producto_id: resma.id, bodega_origen_id: norte.id, bodega_destino_id: sur.id, cantidad: 99
+    });
 
   assert.equal(res.status, 400); // antes: >= 400 (caracterización de D-05)
   assert.match(res.body.error, /insuficiente/);
@@ -38,9 +42,11 @@ test('R1: un traslado que dejaría negativo se rechaza sin tocar saldos ni histo
 
 test('R1: origen y destino no pueden ser la misma bodega', async () => {
   const { resma } = cat.productos; const { norte } = cat.bodegas;
-  const res = await request(app).post('/api/movimientos').send({
-    tipo: 'TRASLADO', producto_id: resma.id, bodega_origen_id: norte.id, bodega_destino_id: norte.id, cantidad: 1
-  });
+  const res = await request(app).post('/api/movimientos')
+    .set('Authorization', `Bearer ${tokenSupervisorMenor(norte.id)}`)
+    .send({
+      tipo: 'TRASLADO', producto_id: resma.id, bodega_origen_id: norte.id, bodega_destino_id: norte.id, cantidad: 1
+    });
   assert.equal(res.status, 400);
 });
 
@@ -48,16 +54,20 @@ test('R4: un producto descontinuado no admite entradas pero sí salidas', async 
   const { teclado } = cat.productos; const { norte } = cat.bodegas;
 
   const entradaRechazada = await request(app).post('/api/movimientos')
+    .set('Authorization', `Bearer ${tokenSupervisorMenor(norte.id)}`)
     .send({ tipo: 'ENTRADA', producto_id: teclado.id, bodega_destino_id: norte.id, cantidad: 1 });
   assert.equal(entradaRechazada.status, 400);
   assert.match(entradaRechazada.body.error, /DESCONTINUADO/);
 
   // Para probar la salida hace falta stock: se crea con un producto activo y luego se descontinúa.
-  const res = await request(app).post('/api/productos').send({ sku: 'X-1', nombre: 'Temporal' });
+  const res = await request(app).post('/api/productos')
+    .set('Authorization', `Bearer ${tokenMenorSetup()}`)
+    .send({ sku: 'X-1', nombre: 'Temporal' });
   await entrada(res.body.id, norte.id, 3);
   await request(app).patch(`/api/productos/${res.body.id}/descontinuar`);
 
   const salida = await request(app).post('/api/movimientos')
+    .set('Authorization', `Bearer ${tokenSupervisorMenor(norte.id)}`)
     .send({ tipo: 'SALIDA', producto_id: res.body.id, bodega_origen_id: norte.id, cantidad: 2 });
   assert.equal(salida.status, 201);
   assert.equal(await existencia(res.body.id, norte.id), 1);
