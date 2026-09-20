@@ -387,23 +387,37 @@ function ajustarCamposMovimiento() {
   $('#campo-destino').classList.toggle('oculto', !usaDestino);
   $('#form-movimiento [name=notas]').required = tipo === 'AJUSTE';
 
-  // Punto 2: para supervisor_menor, fijar la bodega en ENTRADA/SALIDA, liberar en TRASLADO/AJUSTE
   const esMenor = sesionActual.usuario && sesionActual.usuario.rol === 'supervisor_menor';
   const miBodegaId = esMenor ? sesionActual.usuario.bodega_id : null;
-  const fijarBodega = esMenor && (tipo === 'ENTRADA' || tipo === 'SALIDA');
+  const miBodega = esMenor ? catalogo.bodegas.find(b => Number(b.id) === Number(miBodegaId)) : null;
+  const htmlFijo = miBodega ? `<option value="${miBodega.id}">${escapar(miBodega.nombre)}</option>` : '';
+  const htmlTodas = opciones(catalogo.bodegas, b => b.nombre);
 
   const selectOrigen = $('#form-movimiento [name=bodega_origen_id]');
   const selectDestino = $('#form-movimiento [name=bodega_destino_id]');
 
-  if (fijarBodega) {
-    // ENTRADA o SALIDA: solo su bodega, bloqueado
-    const miBodega = catalogo.bodegas.find(b => Number(b.id) === Number(miBodegaId));
-    const htmlFijo = miBodega ? `<option value="${miBodega.id}">${escapar(miBodega.nombre)}</option>` : '';
-    if (selectOrigen) { selectOrigen.innerHTML = htmlFijo; selectOrigen.disabled = true; }
-    if (selectDestino) { selectDestino.innerHTML = htmlFijo; selectDestino.disabled = true; }
+  if (esMenor) {
+    if (tipo === 'ENTRADA') {
+      // Destino fijo a su propia bodega
+      if (selectDestino) { selectDestino.innerHTML = htmlFijo; selectDestino.disabled = true; }
+    } else if (tipo === 'SALIDA') {
+      // Origen fijo a su propia bodega
+      if (selectOrigen) { selectOrigen.innerHTML = htmlFijo; selectOrigen.disabled = true; }
+    } else if (tipo === 'AJUSTE') {
+      // Un ajuste físico siempre ocurre sobre su propia bodega asignada
+      if (sentido === 'ENTRADA') {
+        if (selectDestino) { selectDestino.innerHTML = htmlFijo; selectDestino.disabled = true; }
+      } else {
+        if (selectOrigen) { selectOrigen.innerHTML = htmlFijo; selectOrigen.disabled = true; }
+      }
+    } else if (tipo === 'TRASLADO') {
+      // Origen fijo (el stock sale de su bodega), destino seleccionable (a qué otra bodega enviar)
+      if (selectOrigen) { selectOrigen.innerHTML = htmlFijo; selectOrigen.disabled = true; }
+      const otrasBodegas = catalogo.bodegas.filter(b => Number(b.id) !== Number(miBodegaId));
+      if (selectDestino) { selectDestino.innerHTML = opciones(otrasBodegas, b => b.nombre); selectDestino.disabled = false; }
+    }
   } else {
-    // TRASLADO o AJUSTE (o supervisor_mayor): todas las bodegas disponibles
-    const htmlTodas = opciones(catalogo.bodegas, b => b.nombre);
+    // supervisor_mayor u otros: todas las bodegas disponibles
     if (selectOrigen) { selectOrigen.innerHTML = htmlTodas; selectOrigen.disabled = false; }
     if (selectDestino) { selectDestino.innerHTML = htmlTodas; selectDestino.disabled = false; }
   }
@@ -421,6 +435,11 @@ $('#form-movimiento').addEventListener('submit', (evento) => {
     const miBodega = Number(sesionActual.usuario.bodega_id);
     if (datos.tipo === 'ENTRADA') datos.bodega_destino_id = miBodega;
     if (datos.tipo === 'SALIDA') datos.bodega_origen_id = miBodega;
+    if (datos.tipo === 'TRASLADO') datos.bodega_origen_id = miBodega;
+    if (datos.tipo === 'AJUSTE') {
+      if (datos.sentido === 'ENTRADA') datos.bodega_destino_id = miBodega;
+      else datos.bodega_origen_id = miBodega;
+    }
   }
 
   if ($('#campo-origen').classList.contains('oculto')) delete datos.bodega_origen_id;
