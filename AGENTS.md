@@ -7,7 +7,7 @@
 
 ## Descripción del sistema
 
-StockFlow es un sistema de gestión de inventario multibodega. El objetivo es construir un backend funcional que permita:
+StockFlow es un sistema de gestión de inventario multibodega. El objetivo es construir un proyecto funcional que permita:
 
 - Registrar productos con SKU único y estado (activo / descontinuado).
 - Gestionar bodegas y las existencias de cada producto por bodega.
