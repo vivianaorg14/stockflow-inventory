@@ -239,8 +239,16 @@ function pestanaActiva() {
 
 async function refrescarPestanaActiva(opciones = {}) {
   // Si es un refresco silencioso en segundo plano y el usuario está interactuando con un campo, no interrumpir
-  if (opciones.silencioso && document.activeElement && ['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
-    return;
+  if (opciones.silencioso) {
+    if (document.activeElement && ['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+      return;
+    }
+    // Evitar sobreescribir si el usuario tiene cantidades digitadas en despacho o filas agregadas pendientes
+    const hayInputsConValor = Array.from(document.querySelectorAll('input.despacho-cantidad')).some(i => i.value && Number(i.value) > 0);
+    const hayDespachosStaged = Array.from(document.querySelectorAll('.despachos-pendientes')).some(d => d.children.length > 0);
+    if (hayInputsConValor || hayDespachosStaged) {
+      return;
+    }
   }
   await cargarCatalogo();
   const fn = renderizadores[pestanaActiva()];
@@ -603,6 +611,9 @@ function htmlItemPedido(pedido, item) {
   </li>`;
 }
 
+// Memoria de sugerencias de balanceo activas en la interfaz por id de pedido
+const sugerenciasBalanceoPorPedido = new Map();
+
 async function renderizarPedidos() {
   if ($('#items-pedido').children.length === 0) agregarFilaItem();
   const pedidos = await api('/pedidos');
@@ -610,11 +621,12 @@ async function renderizarPedidos() {
 
   $('#lista-pedidos').innerHTML = pedidos.map(p => {
     const abierto = p.estado === 'PENDIENTE' || p.estado === 'PARCIALMENTE_DESPACHADO';
+    const balanceoHtml = sugerenciasBalanceoPorPedido.get(Number(p.id)) || '';
     return `
     <div class="pedido" data-pedido="${p.id}">
       <h3>#${p.id} ${escapar(p.descripcion ?? '')} <span class="estado ${escapar(p.estado)}">${escapar(p.estado)}</span></h3>
       <ul>${p.items.map(i => htmlItemPedido(p, i)).join('')}</ul>
-      <div class="contenedor-balanceo"></div>
+      <div class="contenedor-balanceo">${balanceoHtml}</div>
       ${abierto ? `
         <button class="despachar">Despachar lo indicado</button>
         ${esMayor ? '<button class="secundario sugerir-balanceo">💡 Sugerir balanceo</button> <button class="peligro cancelar">Cancelar pedido</button>' : ''}
@@ -643,13 +655,23 @@ $('#lista-pedidos').addEventListener('click', (evento) => {
     return;
   }
 
+  if (evento.target.classList.contains('cerrar-balanceo')) {
+    sugerenciasBalanceoPorPedido.delete(Number(pedidoId));
+    const contenedor = tarjeta.querySelector('.contenedor-balanceo');
+    if (contenedor) contenedor.innerHTML = '';
+    return;
+  }
+
   if (evento.target.classList.contains('sugerir-balanceo')) {
     (async () => {
       try {
         const sugerencia = await api(`/pedidos/${pedidoId}/sugerir-reparto`, { method: 'POST' });
         const contenedor = tarjeta.querySelector('.contenedor-balanceo');
         let html = `<div class="caja-balanceo">
-          <h4>💡 Propuesta de balanceo de inventario (solo lectura):</h4>
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
+            <h4 style="margin:0;">💡 Propuesta de balanceo de inventario (solo lectura):</h4>
+            <button type="button" class="secundario cerrar-balanceo" style="padding:2px 8px; font-size:12px; cursor:pointer;" title="Cerrar propuesta">✖ Cerrar</button>
+          </div>
           <p><em>${escapar(sugerencia.criterio)}</em></p>
           <ul>
             ${sugerencia.propuesta_despacho.map(p => `
@@ -660,7 +682,8 @@ $('#lista-pedidos').addEventListener('click', (evento) => {
           html += `<div class="advertencia">⚠️ Advertencias:</div><ul>${sugerencia.advertencias.map(a => `<li>${escapar(a)}</li>`).join('')}</ul>`;
         }
         html += `</div>`;
-        contenedor.innerHTML = html;
+        sugerenciasBalanceoPorPedido.set(Number(pedidoId), html);
+        if (contenedor) contenedor.innerHTML = html;
       } catch (error) {
         avisar(error.message);
       }
@@ -699,12 +722,18 @@ $('#lista-pedidos').addEventListener('click', (evento) => {
       return;
     }
 
-    ejecutar(() => api(`/pedidos/${pedidoId}/despachar`, { method: 'POST', body: { despachos } }), 'Despacho registrado');
+    ejecutar(async () => {
+      await api(`/pedidos/${pedidoId}/despachar`, { method: 'POST', body: { despachos } });
+      sugerenciasBalanceoPorPedido.delete(Number(pedidoId));
+    }, 'Despacho registrado');
     return;
   }
 
   if (evento.target.classList.contains('cancelar')) {
-    ejecutar(() => api(`/pedidos/${pedidoId}/cancelar`, { method: 'POST' }), 'Pedido cancelado');
+    ejecutar(async () => {
+      await api(`/pedidos/${pedidoId}/cancelar`, { method: 'POST' });
+      sugerenciasBalanceoPorPedido.delete(Number(pedidoId));
+    }, 'Pedido cancelado');
   }
 });
 
