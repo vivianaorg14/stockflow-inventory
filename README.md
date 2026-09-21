@@ -9,7 +9,7 @@
 
 ## ¿Qué es StockFlow?
 
-Backend de inventario para una distribuidora con tres bodegas: productos, existencias por
+Proyecto de inventario para una distribuidora con tres bodegas: productos, existencias por
 bodega, movimientos inmutables (entrada, salida, traslado) y pedidos que se despachan desde
 una o varias bodegas. Resuelve el problema del enunciado —"el inventario se lleva en una hoja
 de cálculo por bodega y nunca cuadra"— con una única base de datos y una historia de
