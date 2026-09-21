@@ -15,7 +15,24 @@ una o varias bodegas. Resuelve el problema del enunciado —"el inventario se ll
 de cálculo por bodega y nunca cuadra"— con una única base de datos y una historia de
 movimientos que no se edita.
 
-**Estado:** funcional, con interfaz web, suite de pruebas (52 casos con cobertura >90%), autenticación JWT y control de acceso basado en roles (RBAC) con límite a 3 bodegas.
+**Estado:** funcional, desplegado en producción en la nube (Render), con interfaz web, sincronización en tiempo real (polling 5s), suite de pruebas (56 casos con cobertura >92%), autenticación JWT nativa y control de acceso basado en roles (RBAC) con límite a 3 bodegas.
+
+## Despliegue en Producción (Render — ADR-016)
+
+El sistema se encuentra desplegado y accesible públicamente en la nube a través de **Render**:
+
+- **🌐 Aplicación Web interactiva:** [https://stockflow-inventory-ufps.onrender.com/](https://stockflow-inventory-ufps.onrender.com/)
+- **📦 Consulta obligatoria de existencias (API):** [https://stockflow-inventory-ufps.onrender.com/api/inventario/existencias](https://stockflow-inventory-ufps.onrender.com/api/inventario/existencias)
+- **🗺️ Mapa de endpoints disponibles:** [https://stockflow-inventory-ufps.onrender.com/api](https://stockflow-inventory-ufps.onrender.com/api)
+
+> [!TIP]
+> Puedes iniciar sesión en el despliegue con las credenciales demo:
+> - **Supervisor Mayor:** `carlos.mayor` / `mayor123`
+> - **Supervisor Menor Norte:** `ana.norte` / `norte123`
+> - **Supervisor Menor Sur:** `sergio.sur` / `sur123`
+> - **Supervisor Menor Central:** `camilo.central` / `central123`
+
+---
 
 ## Roles y Usuarios (Extensión de diseño — ADR-015)
 
@@ -45,7 +62,9 @@ Permite al `supervisor_mayor` obtener una propuesta inteligente de cómo reparti
 
 ## Cómo ejecutar desde cero
 
-Requisitos: [Node.js](https://nodejs.org/) ≥ 22 (para `npm test`; ≥ 18 basta para ejecutar) y Git.
+El proyecto puede probarse directamente en su [versión desplegada en la nube](https://stockflow-inventory-ufps.onrender.com/) o ejecutarse localmente.
+
+Requisitos locales: [Node.js](https://nodejs.org/) ≥ 22 (para `npm test`; ≥ 18 basta para ejecutar) y Git.
 Nada más (SQLite es un fichero local).
 
 ```bash
@@ -143,15 +162,15 @@ stockflow-inventory/
 | [`AGENTS.md`](AGENTS.md) | Contexto y reglas entregadas al agente |
 | [`ASSUMPTIONS.md`](ASSUMPTIONS.md) | Decisiones sobre lo que el enunciado no define |
 | [`BITACORA-IA.md`](BITACORA-IA.md) | Cada sesión: qué pedí, qué propuso, qué acepté, qué rechacé |
-| [`docs/adr/`](docs/adr/README.md) | ADR-001 herramienta de IA · ADR-002 base de datos · ADR-003 inmutabilidad · ADR-004..011 asunciones y alcance · ADR-012..014 servicios de dominio, frontend y tipo `AJUSTE` |
+| [`docs/adr/`](docs/adr/README.md) | ADR-001 herramienta de IA · ADR-002 base de datos · ADR-003 inmutabilidad · ADR-004..011 asunciones y alcance · ADR-012..014 servicios de dominio, frontend y tipo `AJUSTE` · ADR-015 roles RBAC y balanceo · ADR-016 despliegue en Render |
 
 ## Limitaciones conocidas
 
-- Sin autenticación ni permisos por bodega ([ADR-010](docs/adr/ADR-010-sin-usuarios-ni-permisos.md)).
-- Sin reservas: la disponibilidad se valida al despachar ([ADR-005](docs/adr/ADR-005-descuento-al-despachar.md)).
-- Cantidades solo enteras ([ADR-009](docs/adr/ADR-009-cantidades-enteras.md)).
-- Sin despliegue.
-- Defectos conocidos y deuda, con prioridad: [docs/06-pendientes.md](docs/06-pendientes.md).
+- **Persistencia en el Free Tier de Render:** En el plan gratuito de Render, el disco local del contenedor es efímero entre *redeploys*; cada nuevo despliegue desde git reinicia el servicio y re-ejecuta el seed demo (`npm run seed`), restableciendo los datos a su estado inicial de prueba ([ADR-016](docs/adr/ADR-016-despliegue-en-render.md)).
+- **Suspensión por inactividad en la nube:** Tras 15 minutos sin peticiones en Render Free, el servicio entra en reposo (*spin down*), demorando entre 30 y 50 segundos en reactivarse en la primera solicitud.
+- **Sin reservas automáticas previas:** La disponibilidad de existencias se valida y descuenta al despachar, no al crear el pedido ([ADR-005](docs/adr/ADR-005-descuento-al-despachar.md)).
+- **Cantidades estrictamente enteras:** No se admiten fracciones ni decimales ([ADR-009](docs/adr/ADR-009-cantidades-enteras.md)).
+- **Deuda técnica y tareas futuras:** Detalladas en [docs/06-pendientes.md](docs/06-pendientes.md).
 
 ## Defensa oral — guía rápida
 

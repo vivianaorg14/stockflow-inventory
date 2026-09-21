@@ -29,6 +29,7 @@ Formato: [MADR 4.0](https://adr.github.io/madr/) reducido, ver [`template.md`](t
 | [ADR-013](ADR-013-frontend-estatico.md) | Frontend estático en `public/` servido por Express | Aceptado | 2026-09-18 |
 | [ADR-014](ADR-014-tipo-ajuste.md) | Tipo `AJUSTE` con sentido y motivo obligatorio | Aceptado | 2026-09-18 |
 | [ADR-015](ADR-015-roles-usuarios-y-limite-bodegas.md) | Roles supervisor mayor/menor, JWT, límite de 3 bodegas y balanceo sugerido | Aceptado | 2026-09-19 |
+| [ADR-016](ADR-016-despliegue-en-render.md) | Despliegue de StockFlow en Render (Web Service unificado y gestión de SQLite efímero) | Aceptado | 2026-09-20 |
 
 ADR-004 a ADR-010 formalizan las asunciones AS-001 a AS-008 de
 [`../../ASSUMPTIONS.md`](../../ASSUMPTIONS.md); el análisis largo de alternativas del que salieron

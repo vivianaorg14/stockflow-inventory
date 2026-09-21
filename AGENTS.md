@@ -124,6 +124,21 @@ Cuando el agente genere código para este proyecto, debe:
 - Decisión de stack: Node.js + Express + SQLite + Sequelize.
 - Instrucción de generar documentación MD (README, AGENTS.md, ASSUMPTIONS.md, BITACORA-IA.md, ADRs).
 
-**Evolución pendiente:**
-- Agregar contexto de código cuando se inicie la implementación.
-- Actualizar si se cambia alguna regla de negocio durante el desarrollo.
+### Sesión 5 — 2026-09-19
+
+**Extensión de diseño incorporada:**
+- Modelo de autenticación y roles jerárquicos: `supervisor_mayor` (global) y `supervisor_menor` (territorial por bodega).
+- Restricción estructural a exactamente 3 bodegas (`POST /api/bodegas` responde HTTP 400 si se intenta crear una cuarta).
+- Balanceo preventivo sugerido en pedidos (`POST /api/pedidos/:id/sugerir-reparto`): algoritmo que sugiere repartos según excedente sobre stock mínimo, sin despachar automáticamente.
+- Token JWT emitido con `crypto` nativo.
+
+### Sesión 6 — 2026-09-20
+
+**Persistencia, Sincronización y Despliegue en la Nube:**
+- Persistencia de sesión en cliente migrada a `localStorage`, corrigiendo la lectura de `/auth/perfil` y eliminando el cierre de sesión al recargar (F5).
+- Sincronización de datos entre usuarios en tiempo real mediante polling inteligente cada 5 segundos en `public/app.js`, pausado automáticamente cuando la pestaña está en segundo plano o el usuario está editando un campo.
+- Creación de productos autorizada para `supervisor_menor`, inicializando filas correspondientes en `ExistenciaPorBodega` (`cantidad_actual: 0`, `minimo: 0`) para que aparezca inmediatamente en la consulta obligatoria de existencias.
+- Despliegue en producción en **Render** como un Web Service Node.js unificado en:
+  `https://stockflow-inventory-ufps.onrender.com/`
+  con build automatizado (`npm install && npm run seed`) y gestión documentada de la persistencia efímera en SQLite (ADR-016).
+

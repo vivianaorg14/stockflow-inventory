@@ -18,6 +18,7 @@ congelado en [`docs/_archivo/2026-09-18-analisis-asunciones.md`](docs/_archivo/2
 | AS-009 | ¿Modelo de roles y permisos? | Jerarquía: 1 `supervisor_mayor` (global) y 1 `supervisor_menor` por bodega con JWT nativo | [ADR-015](docs/adr/ADR-015-roles-usuarios-y-limite-bodegas.md) |
 | AS-010 | ¿Límite en cantidad de bodegas? | Estrictamente 3 bodegas (rechazo con 400 si se intenta crear una cuarta) | [ADR-015](docs/adr/ADR-015-roles-usuarios-y-limite-bodegas.md) |
 | AS-011 | ¿Balanceo de inventario en pedidos? | Sugerencia analítica de reparto basada en excedente sobre el stock mínimo (solo lectura) | [ADR-015](docs/adr/ADR-015-roles-usuarios-y-limite-bodegas.md) |
+| AS-012 | ¿Plataforma de despliegue y persistencia? | Despliegue en Render (Web Service unificado Node.js); se asume la efimeridad de SQLite en Free Tier entre redeploys como limitación conocida de demo | [ADR-016](docs/adr/ADR-016-despliegue-en-render.md) / [ADR-005-despliegue](docs/ADR-005-despliegue.md) |
 
 ## Dependencias entre decisiones
 
@@ -27,9 +28,11 @@ congelado en [`docs/_archivo/2026-09-18-analisis-asunciones.md`](docs/_archivo/2
 - AS-001 (mínimo por par) define la forma de la consulta obligatoria y es la base de cálculo de AS-011 (balanceo).
 - AS-009 (roles) restringe las operaciones de despacho (AS-003) y movimientos al supervisor local asignado a cada bodega.
 - AS-010 (3 bodegas) garantiza la regla estructural de 1 supervisor menor por cada una de las 3 bodegas de la red.
+- AS-012 (despliegue) monta la aplicación completa en Render asegurando compatibilidad con SQLite mediante `npm run seed` en el proceso de build.
 
 ## Extensiones de diseño incorporadas
 
 - Autenticación JWT y control de acceso basado en roles (`supervisor_mayor` y `supervisor_menor`) ([ADR-015](docs/adr/ADR-015-roles-usuarios-y-limite-bodegas.md)).
 - Restricción estricta de 3 bodegas y balanceo inteligente sugerido ([ADR-015](docs/adr/ADR-015-roles-usuarios-y-limite-bodegas.md)).
-- Frontend ligero estático en Vanilla JS/CSS ([ADR-013](docs/adr/ADR-013-frontend-estatico.md)).
+- Frontend ligero estático en Vanilla JS/CSS con polling reactivo de 5s ([ADR-013](docs/adr/ADR-013-frontend-estatico.md)).
+- Despliegue en la nube en producción accesible públicamente vía Render ([ADR-016](docs/adr/ADR-016-despliegue-en-render.md)).

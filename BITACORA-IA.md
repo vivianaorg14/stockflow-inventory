@@ -256,3 +256,47 @@ pequeñas, cada una con su propio subagente, y cerrar con esta misma entrada.
 - Las herramientas nativas de la plataforma (como `crypto` en Node.js) muchas veces eliminan la necesidad de dependencias de terceros, reduciendo la superficie de ataque y los problemas de compatibilidad en entornos de evaluación.
 - El balanceo asistido mediante sugerencias auditables respeta el principio de gobierno humano y trazabilidad contable del sistema.
 
+---
+
+## Sesión 6 — 2026-09-20
+
+**Herramienta usada:** Antigravity (Google DeepMind)  
+**Duración aproximada:** ~1.5 horas  
+**Objetivo de la sesión:** Corregir la persistencia de sesión en frontend, implementar sincronización de datos en tiempo real entre usuarios, ajustar visualización de métricas y desplegar el sistema en producción en la nube.
+
+### Qué pedí
+
+1. Corregir el cierre involuntario de sesión al recargar la página (F5), evaluando `localStorage` vs `sessionStorage`.
+2. Modificar el layout del Dashboard analítico para apilar los gráficos de barras verticalmente a ancho completo.
+3. Resolver la falta de sincronización de cambios entre usuarios distintos sin recargar manualmente la página, evaluando polling periódico vs WebSockets.
+4. Asegurar que al crear un nuevo producto desde el Catálogo (acción exclusiva del `supervisor_menor`), este aparezca reflejado de inmediato en la pantalla de Existencias.
+5. Guiar y configurar los archivos para el despliegue del proyecto en la nube (Vercel y Render), diagnosticando errores de runtime y documentando la arquitectura real de despliegue.
+
+### Qué propuso el agente
+
+- **Diagnóstico de sesión:** Descubrió que al hacer F5, `verificarSesionInicial` fallaba por una desestructuración incorrecta de `GET /api/auth/perfil` (`perfil.usuario` arrojaba `undefined`), lo cual disparaba el `catch` y borraba el token. Propuso migrar el almacenamiento a `localStorage` para garantizar la persistencia multi-pestaña.
+- **Layout:** Reemplazar el grid CSS por un contenedor flex vertical (`width: 100%`) con altura de canvas de 320px.
+- **Sincronización multiusuario:** Recomendó la opción de **polling inteligente cada 5 segundos** en lugar de WebSockets. Esta solución evita dependencias externas pesadas, respeta el estado de la suite de pruebas sin dejar sockets abiertos y suspende las peticiones si la pestaña está oculta (`document.hidden`) o si el usuario está interactuando con un campo del formulario.
+- **Existencias de productos nuevos:** Al crear un producto (`POST /api/productos`), el backend inicializa automáticamente sus registros en `ExistenciaPorBodega` (con cantidad `0` y mínimo `0`) para cada bodega existente, permitiendo que aparezca en la consulta obligatoria sin violar las pruebas existentes.
+- **Diagnóstico de Vercel vs Render:** Identificó que Vercel arroja `Error: Please install sqlite3 package manually` porque sus Lambdas serverless excluyen binarios compilados en C++ y poseen un sistema de archivos de solo lectura (`EROFS`). Recomendó y configuró el despliegue en **Render** como un Web Service Node.js continuo, logrando compilar `sqlite3` de forma nativa e inicializar los datos con `npm run seed`.
+
+### Qué acepté
+
+- La migración a `localStorage` y la corrección del handler de arranque.
+- La solución de polling inteligente cada 5 segundos para mantener a ambos supervisores sincronizados.
+- La decisión de desplegar en Render (`https://stockflow-inventory-ufps.onrender.com/`), descartando la sobre-ingeniería de migrar la base de datos a PostgreSQL en Vercel para una prueba técnica basada en SQLite.
+- La incorporación del [ADR-016](docs/adr/ADR-016-despliegue-en-render.md) y [ADR-005-despliegue](docs/ADR-005-despliegue.md) documentando la limitación de almacenamiento efímero en el plan gratuito de Render.
+- La suite final de **56 pruebas automatizadas** pasando al 100% con **>92% de cobertura de código**.
+
+### Qué rechacé / modifiqué
+
+- Se descartó el uso de WebSockets o SSE debido a la complejidad de mantenimiento de conexiones y potenciales fallos con suites de testing concurrentes.
+- Se mantuvo el permiso exclusivo para que el `supervisor_menor` sea quien cree productos en el Catálogo, rechazando la propuesta inicial de bloquear la creación de productos para ambos roles.
+
+### Aprendizajes de la sesión
+
+- Las plataformas serverless como Vercel imponen restricciones severas sobre dependencias nativas C++ (como `sqlite3`) y sistemas de archivos locales; seleccionar la plataforma adecuada (PaaS de proceso continuo como Render) ahorra refactorizaciones invasivas de base de datos.
+- El polling optimizado con eventos del navegador (`visibilitychange` y verificación de `activeElement`) brinda una experiencia de usuario cercana al tiempo real con un costo de implementación y riesgo operativo casi nulo.
+- Toda limitación de plataforma (como la efimeridad de contenedores gratuitos en redeploy) debe ser documentada como una decisión de arquitectura consciente (ADR) y no como un defecto no planificado.
+
+
